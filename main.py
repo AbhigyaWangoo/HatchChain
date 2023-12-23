@@ -1,4 +1,5 @@
-from binclassifier import ExplainableClassifier
+from classifier.binclassifier import ExplainableClassifier
+from classifier.decisiontree import TreeClassifier
 import chardet
 import os
 from typing import Dict, Set
@@ -76,4 +77,6 @@ def run_binclassifier(dir_path: str, n: int=-1) -> Dict[str, str]:
     return file_to_lbl
 
 if __name__ == "__main__":
-    run_binclassifier(TESTDIR, 20)
+    # run_binclassifier(TESTDIR, 1)
+    tree = TreeClassifier(["Experiences", "skills"], "Distributed Systems Developer")
+    tree.print_tree()
