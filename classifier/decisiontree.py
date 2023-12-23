@@ -46,27 +46,30 @@ class TreeClassifier(base.AbstractClassifier):
         self._depth = len(hyperparams)
         self._heuristic_ct=_heuristic_ct
         self._category = Category(category)
-        
+
         self._heuristic_list = self._generate_heuristic_list()
         self._root = self._construct_tree(root=None, idx=0)
 
-    def classify(self, input: str) -> str:
-        win_list, loss_list = self._traverse_with_input(self._root, input, [], [])
-        return len(win_list) > len(loss_list)
+    def classify(self, input: str) -> Tuple[bool, str]:
+        win_list, loss_list, reasoning_list = self._traverse_with_input(self._root, input, [], [], [])
 
-    def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str]) -> Tuple[List[str], List[str]]:
+        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+
+    def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
 
         if cur_node is not None:
-            go_right, _ = self._navigate(cur_node, input)
+            go_right, reason = self._navigate(cur_node, input)
+            reasoning_lst.append(reason)
+            
             if go_right:
                 win_lst.append(cur_node.hyperparameter_level.name)
-                self._traverse_with_input(cur_node.right, input, win_lst, loss_lst)
+                self._traverse_with_input(cur_node.right, input, win_lst, loss_lst, reasoning_lst)
             else:
                 loss_lst.append(cur_node.hyperparameter_level.name)
-                self._traverse_with_input(cur_node.left, input, win_lst, loss_lst)
+                self._traverse_with_input(cur_node.left, input, win_lst, loss_lst, reasoning_lst)
         
-        return win_lst, loss_lst        
+        return win_lst, loss_lst, reasoning_lst
 
     def _navigate(self, node: Node, input: str) -> Tuple[bool, str]:
         navigation_str = f"""
