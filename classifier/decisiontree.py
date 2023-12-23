@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from . import base
 from abc import ABC
 
@@ -51,8 +51,39 @@ class TreeClassifier(base.AbstractClassifier):
         self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> str:
+        win_list, loss_list = self._traverse_with_input(self._root, input, [], [])
+        return len(win_list) > len(loss_list)
+
+    def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str]) -> Tuple[List[str], List[str]]:
+        """ Traverses the tree with the input, uses comparison function to generate wins or losses """
+
+        if cur_node is not None:
+            go_right, _ = self._navigate(cur_node, input)
+            if go_right:
+                win_lst.append(cur_node.hyperparameter_level.name)
+                self._traverse_with_input(cur_node.right, input, win_lst, loss_lst)
+            else:
+                loss_lst.append(cur_node.hyperparameter_level.name)
+                self._traverse_with_input(cur_node.left, input, win_lst, loss_lst)
         
-        return super().classify(input)
+        return win_lst, loss_lst        
+
+    def _navigate(self, node: Node, input: str) -> Tuple[bool, str]:
+        navigation_str = f"""
+        You have a candidate that you need to accept or reject. On the bases of the following information
+        here: {node.heuristic} decide whether to accept or reject the following candidate: {input} for the
+        position of {self._category.name}. Your output should always be modelled as follows:
+
+        reject | accept:<reasoning for why the candidate should be accepted or rejected>
+        """
+
+        res = self._prompt_gpt(navigation_str)
+        reasoning = res.split(":")[-1]
+        reject_ct = res.lower().count("reject")
+        accept_ct = res.lower().count("accept")
+
+        return accept_ct > reject_ct, reasoning
+
 
     def _generate_heuristic_list(self) -> List[str]:
         heuristics = []
