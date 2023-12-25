@@ -1,5 +1,7 @@
 from classifier.binclassifier import ExplainableClassifier
 from classifier.decisiontree import TreeClassifier
+from classifier import base
+import openai
 import chardet
 import os
 from typing import Dict, Set
@@ -36,7 +38,6 @@ def run_binclassifier(dir_path: str, n: int=-1) -> Dict[str, str]:
     """ 
     Returns a dict of {filename: label}
     """
-    classifier = ExplainableClassifier(["work experiences", "Skills", "university"])
 
     file_to_lbl = {}
     files = os.listdir(dir_path)
@@ -59,24 +60,33 @@ def run_binclassifier(dir_path: str, n: int=-1) -> Dict[str, str]:
             lbls = set(lbl.split("\n"))
             
             for lbl_line in LABELS:
-                decision, reason = classifier.classify(data, lbl_line)
-                if (lbl_line in lbls and decision) or (lbl_line not in lbls and not decision):
-                    s+=1.0
-                total+=1.0
-            
-                print(f"Running accuracy= {s/total}\r")
+                try:
+                    classifier = TreeClassifier(["Experiences", "Skills"], lbl_line)
+                    decision, reason = classifier.classify(data)
+                    print(reason)
+                    if (lbl_line in lbls and decision) or (lbl_line not in lbls and not decision):
+                        s+=1.0
+                    total+=1.0
+                
+                    print(f"Running accuracy= {s/total}\r")
 
-                if n > 0:
-                    n-=1
-                elif n==0:
-                    break
+                    if n > 0:
+                        n-=1
+                    elif n==0:
+                        break
+                except openai.error.InvalidRequestError:
+                    print("CONTEXT LENGTH EXCEEDED, CONTINUING")
 
             data=""
             lbl=""
     
+    print(f"FINAL accuracy= {s/total}\r")
     return file_to_lbl
 
 if __name__ == "__main__":
-    # run_binclassifier(TESTDIR, 1)
-    tree = TreeClassifier(["Experiences", "skills"], "Distributed Systems Developer")
-    tree.print_tree()
+    # tree = TreeClassifier(["Experiences", "skills"], "Database_Administrator")
+    run_binclassifier(TESTDIR, 1)
+    # data = read_from("data/ResumeClassifierData/00001.txt")
+    # classification, res = tree.classify(data)
+    # print(res)
+    # print(classification)
