@@ -1,0 +1,5 @@
+chardet
+openai
+scikit-learn
+pandas
+spacy
