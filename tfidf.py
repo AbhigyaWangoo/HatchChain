@@ -75,10 +75,20 @@ def get_top_n_terms(dataset_dir: str, categroy: str, n: int = 25) -> List[str]:
 
     return n_words
 
-# print(get_top_n_terms(TESTDIR, "Database_Administrator", 100))
-def create_category_csvs(category_list: List[str]):
-    for category in category_list:
-        dataframe = get_top_n_terms(TESTDIR, category, 100)
-        dataframe.to_csv(f"{category}-100.csv")
+def get_top_terms(dataset_dir: str, categroy: str) -> Dict[str, float]:
+    cps = get_corpus_for_category(dataset_dir, categroy)
+    top_terms = term_frequency_inverse_document_frequency(cps)
 
-create_category_csvs(LABELS)
+    return top_terms
+
+# print(get_top_n_terms(TESTDIR, "Database_Administrator", 100))
+def create_category_csvs(category_list: List[str], dir_path: str, n:int=25):
+    for category in category_list:
+        if n < 0:
+            dataframe = get_top_terms(TESTDIR, category)
+            dataframe.to_csv(f"{dir_path}{category}-full.csv")
+        else:
+            dataframe = get_top_n_terms(TESTDIR, category, n)
+            dataframe.to_csv(f"{dir_path}{category}-{n}.csv")
+
+create_category_csvs(LABELS, "data/", -1)

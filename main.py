@@ -1,13 +1,12 @@
 from classifier.binclassifier import ExplainableClassifier
 from classifier.decisiontree import TreeClassifier
-from classifier import base
 import openai
 import chardet
 import os
-from typing import Dict, Set
+from typing import Dict, Set, List
 
 NOLABEL="nolabel"    
-TESTDIR="data/ResumeClassifierData/"
+TESTDIR="data/"
 LABELS = {'Database_Administrator', 'Project_manager',  'Java_Developer', 'Python_Developer',  'Software_Developer', 'Web_Developer', 'Systems_Administrator', 'Network_Administrator'}
 
 def detect_encoding(file_path):
@@ -84,8 +83,9 @@ def run_binclassifier(dir_path: str, n: int=-1) -> Dict[str, str]:
     return file_to_lbl
 
 if __name__ == "__main__":
-    # tree = TreeClassifier(["Experiences", "skills"], "Database_Administrator")
-    run_binclassifier(TESTDIR, 1)
+    tree = TreeClassifier(["Experiences", "skills"], "Database_Administrator")
+    tree.print_tree()
+    # run_binclassifier(TESTDIR, 1)
     # data = read_from("data/ResumeClassifierData/00001.txt")
     # classification, res = tree.classify(data)
     # print(res)

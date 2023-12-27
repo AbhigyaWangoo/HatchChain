@@ -1,9 +1,11 @@
 from typing import List, Tuple
 from . import base
 from abc import ABC
+import pandas as pd
 
 DEBUG_HEURISTIC="This is a sample heuristic for now for debugging purposes"
 ROOT="ROOT"
+KEYWORD_HEURISTIC="Relevant Keywords"
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -39,7 +41,7 @@ class TreeClassifier(base.AbstractClassifier):
     contain classifications.
     """
 
-    def __init__(self, hyperparams: List[str], category: str, _heuristic_ct: int = 5) -> None:
+    def __init__(self, hyperparams: List[str], category: str, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
             self._hyperparam_lst.append(HyperParameter(param))
@@ -47,12 +49,15 @@ class TreeClassifier(base.AbstractClassifier):
         self._heuristic_ct=_heuristic_ct
         self._category = Category(category)
 
-        self._heuristic_list = self._generate_heuristic_list()
+        if consider_keywords:
+            self._hyperparam_lst.append(HyperParameter(KEYWORD_HEURISTIC))
+            self._depth+=1
+
+        self._heuristic_list = self._generate_heuristic_list(consider_keywords)
         self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(self._root, input, [], [], [])
-
         return len(win_list) > len(loss_list), ' '.join(reasoning_list)
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
@@ -88,9 +93,18 @@ class TreeClassifier(base.AbstractClassifier):
         return accept_ct > reject_ct, reasoning
 
 
-    def _generate_heuristic_list(self) -> List[str]:
+    def _generate_heuristic_list(self, consider_keywords: bool) -> List[str]:
         heuristics = []
         
+        def __get_keyword_heuristic(term_count: int = 20) -> str:
+            keyword_file = f"{self._category}-full.csv"
+            df = pd.read_csv(keyword_file)
+
+            trimmed_df = df.head(term_count)
+            term_list = trimmed_df[''].tolist()
+
+            return ','.join(term_list)
+
         for hyperparam in self._hyperparam_lst:
             heuristic_prompt=f"""
             To be considered capable for {self._category.name}, concerning {hyperparam.name}, generate 
@@ -101,19 +115,19 @@ class TreeClassifier(base.AbstractClassifier):
             heuristic = self._prompt_gpt(heuristic_prompt)
             heuristics.append(heuristic)
         
+        heuristics.append(__get_keyword_heuristic())
+        
         return heuristics
             
     def _construct_tree(self, root: Node, idx: int) -> Node:
         hyperparam = self._hyperparam_lst[idx]
         heuristic = self._heuristic_list[idx]
-        # heuristic = "This is a sample heuristic for now for debugging purposes"
 
         if root == None:
             root = Node(heuristic=heuristic, level=hyperparam)
         else:
             root.heuristic = heuristic
             root.hyperparameter_level = hyperparam
-            print(f"heurisitc: {heuristic[0:5]}, level: {hyperparam.name}")
 
         if idx < self._depth-1:
             root.left = Node()
