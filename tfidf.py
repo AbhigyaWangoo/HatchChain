@@ -1,7 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 import pandas as pd
 from typing import List, Dict
-from main import TESTDIR, read_from
+from main import TESTDIR, read_from, LABELS
 import os
 from tqdm import tqdm
 import spacy
@@ -53,17 +53,32 @@ def term_frequency_inverse_document_frequency(corpus: List[str]) -> Dict[str, fl
 
     docs = []
     for document in tqdm(corpus, desc="Collecting document data"):
-        data = read_from(document)
-        docs.append(data)
+        try:
+            data = read_from(document)
+            docs.append(data)
+        except:
+            pass
 
     docs = preprocess(docs)
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(docs)
     feature_names = vectorizer.get_feature_names_out()
     df_tfidf = pd.DataFrame(data=tfidf_matrix.toarray(), columns=feature_names)
-    
-    top_100_terms = df_tfidf.sum().sort_values(ascending=False).to_csv("terms.csv", header=True)
 
+    top_terms = df_tfidf.sum().sort_values(ascending=False)
+    return top_terms
 
-cps = get_corpus_for_category(TESTDIR, "Database_Administrator")
-term_frequency_inverse_document_frequency(cps)
+def get_top_n_terms(dataset_dir: str, categroy: str, n: int = 25) -> List[str]:
+    cps = get_corpus_for_category(dataset_dir, categroy)
+    top_terms = term_frequency_inverse_document_frequency(cps)
+    n_words = top_terms.head(n)
+
+    return n_words
+
+# print(get_top_n_terms(TESTDIR, "Database_Administrator", 100))
+def create_category_csvs(category_list: List[str]):
+    for category in category_list:
+        dataframe = get_top_n_terms(TESTDIR, category, 100)
+        dataframe.to_csv(f"{category}-100.csv")
+
+create_category_csvs(LABELS)
