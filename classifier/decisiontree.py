@@ -6,6 +6,7 @@ import pandas as pd
 DEBUG_HEURISTIC="This is a sample heuristic for now for debugging purposes"
 ROOT="ROOT"
 KEYWORD_HEURISTIC="Relevant Keywords"
+OUTPUT_CSV_DIR="data/label_keywords/"
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -48,10 +49,6 @@ class TreeClassifier(base.AbstractClassifier):
         self._depth = len(hyperparams)
         self._heuristic_ct=_heuristic_ct
         self._category = Category(category)
-
-        if consider_keywords:
-            self._hyperparam_lst.append(HyperParameter(KEYWORD_HEURISTIC))
-            self._depth+=1
 
         self._heuristic_list = self._generate_heuristic_list(consider_keywords)
         self._root = self._construct_tree(root=None, idx=0)
@@ -97,13 +94,16 @@ class TreeClassifier(base.AbstractClassifier):
         heuristics = []
         
         def __get_keyword_heuristic(term_count: int = 20) -> str:
-            keyword_file = f"{self._category}-full.csv"
+            keyword_file = f"{OUTPUT_CSV_DIR}{self._category.name}-full.csv"
             df = pd.read_csv(keyword_file)
 
             trimmed_df = df.head(term_count)
-            term_list = trimmed_df[''].tolist()
-
-            return ','.join(term_list)
+            term_list = trimmed_df.iloc[:, 0].tolist()
+            strterms = ','.join(term_list)
+            
+            final_heuristic = f"candidates have the following keywords on their resume for {self._category.name}: {strterms}"
+            
+            return final_heuristic
 
         for hyperparam in self._hyperparam_lst:
             heuristic_prompt=f"""
@@ -115,7 +115,12 @@ class TreeClassifier(base.AbstractClassifier):
             heuristic = self._prompt_gpt(heuristic_prompt)
             heuristics.append(heuristic)
         
-        heuristics.append(__get_keyword_heuristic())
+        if consider_keywords:
+            self._hyperparam_lst.append(HyperParameter(KEYWORD_HEURISTIC))
+            heuristics.append(__get_keyword_heuristic())
+            self._depth+=1
+        
+        print(heuristics)
         
         return heuristics
             
