@@ -1,9 +1,29 @@
-from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from typing import List, Dict, Tuple
-from main import detect_encoding, TESTDIR
+import pandas as pd
+from typing import List, Dict
+from main import TESTDIR, read_from, LABELS
 import os
 from tqdm import tqdm
+import spacy
+
+def preprocess(dataset: List[str]) -> List[str]:
+    # Load the spaCy English model
+    nlp = spacy.load("en_core_web_sm")
+
+    # Function to filter non-nouns
+    def filter_nouns(text):
+        doc = nlp(text)
+        return ' '.join([token.text for token in doc if token.pos_ == 'PROPN'])
+
+    # Apply the function to each element in the dataset
+    filtered_dataset = [filter_nouns(sentence) for sentence in tqdm(dataset, desc="Removing filter words from dataset")]
+
+    # Display the result
+    # for original, filtered in zip(dataset, filtered_dataset):
+    #     print(f"Original: {original}")
+    #     print(f"Filtered: {filtered}\n")
+
+    return filtered_dataset
 
 def get_corpus_for_category(dir_path: str, category: str) -> List[str]:
     """ 
@@ -13,19 +33,16 @@ def get_corpus_for_category(dir_path: str, category: str) -> List[str]:
     files.sort()
     corpus = []
 
-    for file in tqdm(files, desc="Processing Files", unit="file", mininterval=1.0):
+    for file in tqdm(files, desc="Processing Files", unit="file"):
         base_fname, ext = os.path.splitext(file)
 
         if ext == ".lab":
             file_path = dir_path+file
-            # encoding=detect_encoding(file_path)
             with open(file_path, "r", encoding="utf8") as fp:
-                print(file_path)
                 lbls = set(fp.readlines())
-                print(file_path)
 
                 if category in lbls:
-                    datafile = base_fname + ".txt"
+                    datafile = dir_path + base_fname + ".txt"
                     corpus.append(datafile)
 
     return corpus
@@ -34,40 +51,34 @@ def get_corpus_for_category(dir_path: str, category: str) -> List[str]:
 def term_frequency_inverse_document_frequency(corpus: List[str]) -> Dict[str, float]:
     """ a function to calculated the TF IDF scores of each word in the corpus """
 
-    def term_frequency(document: str) -> Dict[float]:
-        """ 
-        Calculates the frequency of a term according to the below formula:
-        TF(t,d)= Total number of terms in document d / Number of times term t appears in document d
+    docs = []
+    for document in tqdm(corpus, desc="Collecting document data"):
+        try:
+            data = read_from(document)
+            docs.append(data)
+        except:
+            pass
 
-        This function returns a dictionary of terms to their TF score.
-        """
-        document_data = read_from(document)
-        terms = document_data.split(" ")
+    docs = preprocess(docs)
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(docs)
+    feature_names = vectorizer.get_feature_names_out()
+    df_tfidf = pd.DataFrame(data=tfidf_matrix.toarray(), columns=feature_names)
 
-        total_termcount = len(terms)
-        term_dict = {}
-        for term in terms:
-            if term in term_dict:
-                term_dict[term]+=1
-            else:
-                term_dict[term]=1
+    top_terms = df_tfidf.sum().sort_values(ascending=False)
+    return top_terms
 
-        tf_scores = {}
-        for term in term_dict.items():
-            tf_scores[term] = term_dict[term] / total_termcount
+def get_top_n_terms(dataset_dir: str, categroy: str, n: int = 25) -> List[str]:
+    cps = get_corpus_for_category(dataset_dir, categroy)
+    top_terms = term_frequency_inverse_document_frequency(cps)
+    n_words = top_terms.head(n)
 
-        return tf_scores
+    return n_words
 
-    def inverse_doc_frequency():
-        """
-        Calculates the inverse document frequency according to the following formula
-        IDF(t,D)=log(Number of documents containing term t / Total number of documents in the corpus N)
-        """
-        pass
+# print(get_top_n_terms(TESTDIR, "Database_Administrator", 100))
+def create_category_csvs(category_list: List[str]):
+    for category in category_list:
+        dataframe = get_top_n_terms(TESTDIR, category, 100)
+        dataframe.to_csv(f"{category}-100.csv")
 
-    for document in corpus:
-        res = term_frequency(document=document)
-        print(res)
-
-cps = get_corpus_for_category(TESTDIR, "Database_Administrator")
-# term_frequency_inverse_document_frequency(cps)
+create_category_csvs(LABELS)
