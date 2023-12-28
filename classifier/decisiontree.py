@@ -27,7 +27,6 @@ class Node(ABC):
         self.heuristic: str = ""
         self.hyperparameter_level: HyperParameter = None
 
-
     def __init__(self, heuristic: str = None, level: HyperParameter = None) -> None:
         self.left: Node = None
         self.right: Node = None
