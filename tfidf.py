@@ -55,7 +55,7 @@ def term_frequency_inverse_document_frequency(corpus: List[str]) -> Dict[str, fl
     for document in tqdm(corpus, desc="Collecting document data"):
         try:
             data = read_from(document)
-            docs.append(data)
+            docs.append(data[0])
         except:
             pass
 
