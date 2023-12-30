@@ -1,12 +1,22 @@
-from typing import List, Tuple
-from . import base
+from typing import List, Tuple, Dict, Set
 from abc import ABC
 import pandas as pd
+import gensim
+import os
+
+from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn import datasets
+from sklearn.model_selection import train_test_split
+from sklearn.tree import export_graphviz
+
+from . import base
+from utils.utils import lbl_to_resumeset
 
 DEBUG_HEURISTIC="This is a sample heuristic for now for debugging purposes"
 ROOT="ROOT"
 KEYWORD_HEURISTIC="Relevant Keywords"
 OUTPUT_CSV_DIR="data/label_keywords/"
+DATAMODELS="data/models/"
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -48,13 +58,31 @@ class TreeClassifier(base.AbstractClassifier):
         self._depth = len(hyperparams)
         self._heuristic_ct=_heuristic_ct
         self._category = Category(category)
+        self._include_keywords = consider_keywords
 
-        self._heuristic_list = self._generate_heuristic_list(consider_keywords)
-        self._root = self._construct_tree(root=None, idx=0)
+        # self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+        # self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(self._root, input, [], [], [])
         return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+    
+    def fit(self, dataset: str):
+        """ 
+        Given a dataset, fits a decision tree classifier and uses the decision path as 
+        context when choosing the final classification decision. 
+        """
+        
+        corpus = lbl_to_resumeset(dataset, {self._category.name}, disable=False)
+        
+        def __vectorize(vector_size: int = 50, epochs: int = 40):
+            model = gensim.models.doc2vec.Doc2Vec(vector_size=vector_size, min_count=2, epochs=epochs)
+            model_fpath = f"{DATAMODELS}{self._category.name}.model"
+            
+            if os.path.isfile(model_fpath):
+                model.load(model_fpath)
+            
+            model.train(corpus.values())
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
@@ -74,9 +102,9 @@ class TreeClassifier(base.AbstractClassifier):
 
     def _navigate(self, node: Node, input: str) -> Tuple[bool, str]:
         navigation_str = f"""
-        You have a candidate that you need to accept or reject. On the bases of the following information
-        here: {node.heuristic} decide whether to accept or reject the following candidate: {input} for the
-        position of {self._category.name}. Your output should always be modelled as follows:
+        You have a candidate and a label. On the bases of the following information
+        here: {node.heuristic} decide whether the following candidate: {input} fits the category 
+        of {self._category.name}. Your output should always be modelled as follows:
 
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """

@@ -14,14 +14,20 @@ class AbstractClassifier(ABC):
     def classify(self, input: str) -> str:
         pass
 
-    def _prompt_gpt(self, prompt: str, tokenlimit: int = 1000, engine: str = "text-davinci-003", temperature: int = 0.7) -> str:
+    def _prompt_gpt(self, prompt: str, engine: str = "gpt-3.5-turbo-16k", temperature: int = 0.2) -> str:
         """ A simple wrapper to the gpt api """
 
-        completion = client.completions.create(prompt=prompt,
-                                               model=engine,
-                                               max_tokens=tokenlimit,
-                                               temperature=temperature)
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model=engine,
+            temperature=temperature
+        )
 
-        generated_response = completion.choices[0].text.strip()
+        generated_response = response.choices[0].message.content.strip()
 
         return generated_response

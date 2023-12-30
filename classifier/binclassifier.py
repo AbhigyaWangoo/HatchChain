@@ -1,5 +1,7 @@
 from typing import Tuple, Dict, List
-import openai
+from openai import OpenAI
+
+client = OpenAI()
 from . import base
 
 class ExplainableClassifier(base.AbstractClassifier):
@@ -49,10 +51,8 @@ class ExplainableClassifier(base.AbstractClassifier):
         resume: {input}
         """
 
-        completion = openai.Completion.create(
-            prompt=output_prompt,
-            engine="text-davinci-003"
-        )
+        completion = client.completions.create(prompt=output_prompt,
+        engine="text-davinci-003")
 
         generated_response = completion['choices'][0]['text'].strip()
         decision, *reason = generated_response.split(":")
@@ -65,11 +65,9 @@ class ExplainableClassifier(base.AbstractClassifier):
         """Helper function to truncate a string at a specific point and recursively summarize it"""
         summarizer_prompt = f"Summarize the following into exactly {str(cutoff)} characters or less: {chunk}"
         
-        completion = openai.Completion.create(
-            prompt=summarizer_prompt,
-            engine="text-davinci-003",
-            max_tokens=cutoff,
-        )
+        completion = client.completions.create(prompt=summarizer_prompt,
+        engine="text-davinci-003",
+        max_tokens=cutoff)
 
         generated_response = completion['choices'][0]['text'].strip()
 
@@ -114,10 +112,8 @@ class ExplainableClassifier(base.AbstractClassifier):
         <true | false>:<paragraph formatted reasoning>
         """
 
-        completion = openai.Completion.create(
-            prompt=final_classification_context,
-            engine="text-davinci-003"
-        )
+        completion = client.completions.create(prompt=final_classification_context,
+        engine="text-davinci-003")
 
         generated_response = completion['choices'][0]['text'].strip()
         decision, *reasons = generated_response.split(":")
