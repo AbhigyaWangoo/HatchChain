@@ -2,6 +2,7 @@ from typing import List, Tuple, Dict, Set
 from abc import ABC
 import pandas as pd
 import gensim
+import pickle
 import os
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -22,7 +23,7 @@ ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
 OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
-
+SAVED_MODEL="data/models/SavedModel.pickle"
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -84,11 +85,16 @@ class TreeClassifier(base.AbstractClassifier):
         context when choosing the final classification decision. 
         """
 
-        corpus = lbl_to_resumeset(
-            dataset, {self._category.name}, disable=False)
+        if not os.path.isfile(SAVED_MODEL):
+            corpus = lbl_to_resumeset(
+                dataset, {}, disable=False)
 
         def __build_decision_tree(vector_size: int = 50, epochs: int = 40) -> DecisionTreeClassifier:
             """ Returnes a trained Doc2Vec model """
+            
+            if os.path.isfile(SAVED_MODEL):
+                return pickle.load(open(SAVED_MODEL, "rb"))
+            
             documents = corpus[self._category.name]
             
             # Tokenize the documents
@@ -117,7 +123,7 @@ class TreeClassifier(base.AbstractClassifier):
             accuracy = accuracy_score(y_test, y_pred)
             print("Accuracy on the test set:", accuracy)
             
-            # dt_classifier.
+            pickle.dump(model, open(SAVED_MODEL, 'wb'))
             
             return dt_classifier
         
