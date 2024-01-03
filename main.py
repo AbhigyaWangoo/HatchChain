@@ -1,7 +1,10 @@
-from classifier.decisiontree import TreeClassifier
+from classifier.decisiontree import ExplainableTreeClassifier
 import openai
 import os
+import pickle
 from typing import Dict, Set, List
+
+from nltk.tokenize import word_tokenize
 from utils.utils import read_from, TESTDIR, LABELS
 
 client = openai.OpenAI()
@@ -28,7 +31,7 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
             for lbl_line in LABELS:
                 try:
-                    classifier = TreeClassifier(
+                    classifier = ExplainableTreeClassifier(
                         ["Experiences", "Skills"], lbl_line)
                     decision, reason = classifier.classify(data)
 
@@ -55,15 +58,5 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    tree = TreeClassifier(["Experiences", "skills"], "Database_Administrator")
+    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
     tree.fit(TESTDIR)
-
-    # string_lst = read_from("data/00010.txt")
-    # str_val = ''.join(string_lst)
-
-    # accept, reason = tree.classify(str_val)
-
-    # from utils.utils import lbl_to_resumeset_multiproc
-    
-    # corpus = lbl_to_resumeset_multiproc(
-    #             TESTDIR, {}, disable=False, n_processes=10)
