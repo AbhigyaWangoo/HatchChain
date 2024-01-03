@@ -161,3 +161,5 @@ cython_debug/
 openai.sh
 data/*.lab
 data/*.txt
+main
+nohup.out
