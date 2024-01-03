@@ -110,7 +110,9 @@ class TreeClassifier(base.AbstractClassifier):
         """
 
         if not os.path.isfile(SAVED_DOC2VEC):
-            corpus = lbl_to_resumeset_multiproc(dataset, {}, disable=False, n_processes=35)
+            corpus = lbl_to_resumeset_multiproc(dataset, set(), disable=False)
+
+        manager = multiprocessing.Manager()
 
         def __build_decision_tree(vector_size: int = 50, epochs: int = 100) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
             """ 
@@ -121,14 +123,22 @@ class TreeClassifier(base.AbstractClassifier):
             if os.path.isfile(SAVED_DTMODEL) and os.path.isfile(SAVED_DOC2VEC):
                 return pickle.load(open(SAVED_DTMODEL, "rb")), pickle.load(open(SAVED_DOC2VEC, "rb"))
 
-            # Combine all labels for each document
-            print(corpus.keys())
-            tagged_data = []
-            for category, documents in corpus.items():
+            def __tag_documents(category:str, documents, tagged_data):
                 for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}"): # TODO multiprocess me
                     tokenized_doc = word_tokenize(doc.lower())
                     tags = [category]
                     tagged_data.append(TaggedDocument(words=tokenized_doc, tags=tags))
+
+            # Combine all labels for each document
+            tagged_data = manager.list()
+            proccesses = []
+            for category, documents in corpus.items():
+                p = multiprocessing.Process(target=__tag_documents, args=(category, documents, tagged_data))
+                proccesses.append(p)
+                p.start()
+
+            for proc in proccesses:
+                proc.join()
 
             #  Split the data into training and testing sets
             X_train, X_test = train_test_split(tagged_data, test_size=0.2, random_state=42)
@@ -141,6 +151,9 @@ class TreeClassifier(base.AbstractClassifier):
 
             # Transform the training data using the trained Doc2Vec model
             X_train_vectors = np.array([model.infer_vector(doc.words) for doc in X_train])
+
+            def __train_dt_binclassifier():
+                pass
 
             # Train a separate binary classifier for each category
             category_classifiers = {}

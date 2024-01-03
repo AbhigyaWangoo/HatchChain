@@ -1,8 +1,11 @@
-from typing import Dict, Set, List
+from typing import Dict, Set, List, Any
+from types import MappingProxyType
 import os
+import json
 import chardet
 import tqdm
-from multiprocessing import Process, Lock
+from typeguard import typechecked
+from multiprocessing import Process, Lock, Manager, cpu_count
 
 NOLABEL = "nolabel"
 TESTDIR = "data/"
@@ -19,7 +22,7 @@ def read_from(filename: str) -> List[str]:
     try:
         encoding = detect_encoding(filename)
         with open(filename, "r", encoding=encoding) as fp:
-            return fp.readlines()
+            return fp.read().splitlines()
     except Exception as e:
         print(f"Error reading from file {filename}. Error: {e}")
         return []
@@ -65,17 +68,18 @@ def lbl_to_resumeset(dir_path: str, label_set: Set, files: List[str] = [], disab
     
     return res
 
-
-def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True, n_processes: int = 1) -> Dict[str, Set[str]]:
-    
+def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True, process_percentage: float = 0.9):
     dir_files = os.listdir(dir_path)
     dir_files.sort()
+    manager = Manager()
+    res = manager.dict()
 
     proccesses = []
+    n_processes = int(cpu_count() * process_percentage)
     chunk_size = len(dir_files) // n_processes
     lock = Lock()
 
-    def __read_chunk(lock: Lock, start_idx: int, end_idx: int, rv_acc: Dict[str, Set[str]]) -> None:
+    def __read_chunk(lock: Lock, start_idx: int, end_idx: int, rv_acc) -> None:
         chunk = start_idx // chunk_size
 
         for idx in tqdm.tqdm(range(start_idx, end_idx-1), disable=disable, desc=f"Processing chunk {chunk} of {n_processes}"):
@@ -95,22 +99,19 @@ def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True
                             
                             lock.acquire()
                             if lbl_found not in rv_acc:
-                                rv_acc[lbl_found] = set()
-                            rv_acc[lbl_found].add(data)
+                                rv_acc[lbl_found] = manager.list()
                             
+                            rv_acc[lbl_found].append(data)
+
                             lock.release()
             idx+=1
     
-    res = {}
     for idx in range(n_processes):
         p = Process(target=__read_chunk, args=(lock, idx * chunk_size, (idx+1)*chunk_size, res))
-        print(f"starting process with {idx * chunk_size} to {(idx+1)*chunk_size}")
         proccesses.append(p)
         p.start()
         
     for process in proccesses:
         process.join()
-    
-    print(res.keys())
-    return res
 
+    return res
