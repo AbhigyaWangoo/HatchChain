@@ -1,12 +1,8 @@
 from classifier.decisiontree import TreeClassifier
 import openai
-import chardet
 import os
 from typing import Dict, Set, List
-from utils.utils import read_from, TESTDIR
-
-LABELS = {'Database_Administrator', 'Project_manager',  'Java_Developer', 'Python_Developer',
-          'Software_Developer', 'Web_Developer', 'Systems_Administrator', 'Network_Administrator'}
+from utils.utils import read_from, TESTDIR, LABELS
 
 client = openai.OpenAI()
 
@@ -59,10 +55,10 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    tree = TreeClassifier(["Experiences", "skills"], "Network_Administrator")
+    tree = TreeClassifier(["Experiences", "skills"], "Database_Administrator")
     tree.fit(TESTDIR)
 
-    # string_lst = read_from("data/00001.txt")
+    # string_lst = read_from("data/00010.txt")
     # str_val = ''.join(string_lst)
 
     # accept, reason = tree.classify(str_val)

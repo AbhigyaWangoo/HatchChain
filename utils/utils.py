@@ -9,6 +9,8 @@ from multiprocessing import Process, Lock, Manager, cpu_count
 
 NOLABEL = "nolabel"
 TESTDIR = "data/"
+LABELS = {'Database_Administrator', 'Project_manager',  'Java_Developer', 'Python_Developer',
+          'Software_Developer', 'Web_Developer', 'Systems_Administrator', 'Network_Administrator'}
 
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:

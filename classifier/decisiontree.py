@@ -1,4 +1,4 @@
-from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc
+from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
 from . import base
 from itertools import product
 from typing import List, Tuple, Dict, Set
@@ -24,7 +24,7 @@ ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
 OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
-SAVED_DTMODEL = "data/models/SavedDTModel"
+SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
 
 
@@ -84,24 +84,20 @@ class TreeClassifier(base.AbstractClassifier):
         #     self._root, input, [], [], [])
         # return len(win_list) > len(loss_list), ' '.join(reasoning_list)
 
-        # Tokenize the new document
-        tokenized_new_doc = word_tokenize(input.lower())
+        if not self._dt_classifiers or not self._dt_doc2vec_model:
+            raise ValueError("Models not loaded. Call load_models() first.")
 
-        # Create a TaggedDocument object for the new document
-        tagged_new_doc = TaggedDocument(
-            words=tokenized_new_doc, tags=['new_doc'])
-
-        # Infer the vector representation of the new document using the trained Doc2Vec model
-        inferred_vector = self._dt_doc2vec_model.infer_vector(
-            tagged_new_doc.words)
-
-        # Reshape the vector to match the input format of the decision tree classifier
-        inferred_vector = inferred_vector.reshape(1, -1)
-
-        # Use the trained decision tree classifier to predict the category of the new document. TODO can also return over ALL categories, depends on how many labels we need.
-        predicted_category = self._dt_classifiers[self._category].predict(inferred_vector)
-        print(predicted_category)
-
+        # Preprocess the input document
+        tokenized_doc = word_tokenize(input.lower())
+        infer_vector = self._dt_doc2vec_model.infer_vector(tokenized_doc)
+        
+        predictions = {}
+        for category, classifier in self._dt_classifiers.items():
+            # Make prediction for each category
+            prediction = classifier.predict([infer_vector])[0]
+            predictions[category] = prediction
+        
+        print(predictions)
         return True, ""
 
     def fit(self, dataset: str):
@@ -121,8 +117,17 @@ class TreeClassifier(base.AbstractClassifier):
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
             """
 
-            if os.path.isfile(SAVED_DTMODEL) and os.path.isfile(SAVED_DOC2VEC):
-                return pickle.load(open(SAVED_DTMODEL, "rb")), pickle.load(open(SAVED_DOC2VEC, "rb"))
+            if os.path.isfile(SAVED_DOC2VEC):
+                model_files = os.listdir(DATAMODELS)
+                
+                category_classifiers = {}
+                for mfile in model_files:
+                    splitted_file = mfile.split("-")
+                    
+                    if len(splitted_file) > 1 and splitted_file[0] == SAVED_DTMODEL:
+                        category_classifiers[splitted_file[-1]] = pickle.load(open(F"{DATAMODELS}{mfile}", "rb"))
+                
+                return category_classifiers, pickle.load(open(SAVED_DOC2VEC, "rb"))
 
             def __tag_documents(category:str, documents, tagged_data):
                 for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}", disable=disable):
@@ -191,23 +196,25 @@ class TreeClassifier(base.AbstractClassifier):
                 try:
                     with open("dt_classifier_report.txt", "a") as fp:
                         print(f"Category: {category}")
-                        fp.write(f"Category: {category}")
+                        fp.write(f"Category: {category}\n")
 
                         print(f"Accuracy: {accuracy}")
-                        fp.write(f"Accuracy: {accuracy}")
+                        fp.write(f"Accuracy: {accuracy}\n")
 
                         print(f"Classification Report:\n {report}")
-                        fp.write(f"Classification Report:\n {report}")
+                        fp.write(f"Classification Report:\n {report}\n")
                 except Exception as e:
                     print(f"Error saving dt classifier report data to file: {e}")
 
             for category, classifier in category_classifiers.items():
-                pickle.dump(dt_classifier, open(f"{SAVED_DTMODEL}-{category}", 'wb'))
+                # dt_classifier
+                pickle.dump(dt_classifier, open(f"{DATAMODELS}{SAVED_DTMODEL}-{category}", 'wb'))
             pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
 
             return category_classifiers, model
 
         self._dt_classifiers, self._dt_doc2vec_model = __build_decision_tree()
+        self.classify("00001.txt")
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
