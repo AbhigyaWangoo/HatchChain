@@ -7,6 +7,7 @@ import pandas as pd
 import tqdm
 import multiprocessing
 import pickle
+from random import shuffle
 import os
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -23,8 +24,8 @@ ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
 OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
-SAVED_DTMODEL = "data/models/SavedDTModel.pickle"
-SAVED_DOC2VEC = "data/models/Doc2Vec.pickle"
+SAVED_DTMODEL = "data/models/SavedDTModel"
+SAVED_DOC2VEC = "data/models/Doc2Vec"
 
 
 class Category():
@@ -114,7 +115,7 @@ class TreeClassifier(base.AbstractClassifier):
 
         manager = multiprocessing.Manager()
 
-        def __build_decision_tree(vector_size: int = 50, epochs: int = 100) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
+        def __build_decision_tree(vector_size: int = 50, epochs: int = 100, disable: bool = False) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
             """ 
             This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
@@ -124,7 +125,7 @@ class TreeClassifier(base.AbstractClassifier):
                 return pickle.load(open(SAVED_DTMODEL, "rb")), pickle.load(open(SAVED_DOC2VEC, "rb"))
 
             def __tag_documents(category:str, documents, tagged_data):
-                for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}"): # TODO multiprocess me
+                for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}", disable=disable):
                     tokenized_doc = word_tokenize(doc.lower())
                     tags = [category]
                     tagged_data.append(TaggedDocument(words=tokenized_doc, tags=tags))
@@ -144,21 +145,25 @@ class TreeClassifier(base.AbstractClassifier):
             X_train, X_test = train_test_split(tagged_data, test_size=0.2, random_state=42)
 
             # Train a Doc2Vec model
-            vector_size = 50
-            model = Doc2Vec(vector_size=vector_size, window=2, min_count=1, workers=4, epochs=100)
+            model = Doc2Vec(vector_size=vector_size, window=2, min_count=1, workers=4)
+            print("Training Doc2Vec model with corpus")
             model.build_vocab(tagged_data)
-            model.train(tagged_data, total_examples=model.corpus_count, epochs=model.epochs)
+            print("Built vocab")
+            
+            # for _ in tqdm.tqdm(range(epochs), desc="Training Doc2Vec", disable=disable): # TODO one epoch takes like 200 seconds. this might be an overnight thing.
+            shuffle(tagged_data)
+            model.train(list(tagged_data), total_examples=model.corpus_count, epochs=epochs)
+
+            print("Trained Doc2Vec Model")
 
             # Transform the training data using the trained Doc2Vec model
-            X_train_vectors = np.array([model.infer_vector(doc.words) for doc in X_train])
-
-            def __train_dt_binclassifier():
-                pass
+            X_train_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(X_train, desc="Inferring vectors from dataset", disable=disable)])
+            print("transformed training data")
 
             # Train a separate binary classifier for each category
             category_classifiers = {}
             keys=corpus.keys()
-            for category in tqdm.tqdm(keys, desc=f"Training {len(keys)} decision trees"): # TODO multiprocess me?
+            for category in tqdm.tqdm(keys, desc=f"Training {len(keys)} decision trees", disable=disable): # TODO multiprocess me?
                 # Extract binary labels for the current category
                 y_train = [1 if category in doc.tags else 0 for doc in X_train]
 
@@ -169,11 +174,11 @@ class TreeClassifier(base.AbstractClassifier):
                 category_classifiers[category] = dt_classifier
 
             # Transform the testing data using the trained Doc2Vec model
-            X_test_vectors = np.array([model.infer_vector(doc.words) for doc in X_test])
+            X_test_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(X_test, desc="Inferring vectors for test set", disable=disable)])
 
             # Make predictions for each category
             predictions = {}
-            for category, classifier in category_classifiers.items():
+            for category, classifier in tqdm.tqdm(category_classifiers.items(), desc="Classifying test set", disable=disable):
                 predictions[category] = classifier.predict(X_test_vectors)
 
             # Evaluate the performance for each category
@@ -182,14 +187,22 @@ class TreeClassifier(base.AbstractClassifier):
                 y_pred = predictions[category]
                 accuracy = accuracy_score(y_true, y_pred)
                 report = classification_report(y_true, y_pred, target_names=['Not ' + category, category])
-                
-                print(f"Category: {category}")
-                print(f"Accuracy: {accuracy}")
-                print("Classification Report:\n", report)
+
+                try:
+                    with open("dt_classifier_report.txt", "a") as fp:
+                        print(f"Category: {category}")
+                        fp.write(f"Category: {category}")
+
+                        print(f"Accuracy: {accuracy}")
+                        fp.write(f"Accuracy: {accuracy}")
+
+                        print(f"Classification Report:\n {report}")
+                        fp.write(f"Classification Report:\n {report}")
+                except Exception as e:
+                    print(f"Error saving dt classifier report data to file: {e}")
 
             for category, classifier in category_classifiers.items():
                 pickle.dump(dt_classifier, open(f"{SAVED_DTMODEL}-{category}", 'wb'))
-
             pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
 
             return category_classifiers, model
