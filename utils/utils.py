@@ -2,6 +2,7 @@ from typing import Dict, Set, List
 import os
 import chardet
 import tqdm
+from multiprocessing import Process, Lock
 
 NOLABEL = "nolabel"
 TESTDIR = "data/"
@@ -13,7 +14,7 @@ def detect_encoding(file_path):
 
 
 def read_from(filename: str) -> List[str]:
-    """ Reads ONE LINE from the provided file."""
+    """ Reads ALL LINES from the provided file."""
 
     try:
         encoding = detect_encoding(filename)
@@ -38,7 +39,7 @@ def get_all_labels(file_path: str = 'normlized_classes.txt') -> Set:
     return fin
 
 
-def lbl_to_resumeset(dir_path: str, label_set: Set, disable: bool=True) -> Dict[str, Set[str]]:
+def lbl_to_resumeset(dir_path: str, label_set: Set, files: List[str] = [], disable: bool=True, n_processes: int = 1) -> Dict[str, Set[str]]:
     res = {}
     files = os.listdir(dir_path)
     files.sort()
@@ -63,3 +64,53 @@ def lbl_to_resumeset(dir_path: str, label_set: Set, disable: bool=True) -> Dict[
                         res[lbl_found].add(data)
     
     return res
+
+
+def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True, n_processes: int = 1) -> Dict[str, Set[str]]:
+    
+    dir_files = os.listdir(dir_path)
+    dir_files.sort()
+
+    proccesses = []
+    chunk_size = len(dir_files) // n_processes
+    lock = Lock()
+
+    def __read_chunk(lock: Lock, start_idx: int, end_idx: int, rv_acc: Dict[str, Set[str]]) -> None:
+        chunk = start_idx // chunk_size
+
+        for idx in tqdm.tqdm(range(start_idx, end_idx-1), disable=disable, desc=f"Processing chunk {chunk} of {n_processes}"):
+            cur_file = dir_files[idx]
+            base, ext = os.path.splitext(cur_file)
+
+            if ext == ".lab":
+                lbls = read_from(dir_path + cur_file)
+                lbls_found_set = set(lbls)
+
+                if len(label_set) == 0 or (len(label_set) > 0 and len(lbls_found_set.intersection(label_set)) > 0):
+                    data = read_from(dir_path + base + ".txt")
+                    
+                    if len(data) > 0:
+                        data = data[0].strip()
+                        for lbl_found in lbls:
+                            
+                            lock.acquire()
+                            if lbl_found not in rv_acc:
+                                rv_acc[lbl_found] = set()
+                            rv_acc[lbl_found].add(data)
+                            
+                            lock.release()
+            idx+=1
+    
+    res = {}
+    for idx in range(n_processes):
+        p = Process(target=__read_chunk, args=(lock, idx * chunk_size, (idx+1)*chunk_size, res))
+        print(f"starting process with {idx * chunk_size} to {(idx+1)*chunk_size}")
+        proccesses.append(p)
+        p.start()
+        
+    for process in proccesses:
+        process.join()
+    
+    print(res.keys())
+    return res
+

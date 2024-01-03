@@ -61,7 +61,13 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 if __name__ == "__main__":
     tree = TreeClassifier(["Experiences", "skills"], "Network_Administrator")
     tree.fit(TESTDIR)
-    # tree.print_tree()
-    # run_binclassifier(TESTDIR, 10)
 
-    # classification, res = tree.classify(data)
+    # string_lst = read_from("data/00001.txt")
+    # str_val = ''.join(string_lst)
+
+    # accept, reason = tree.classify(str_val)
+
+    # from utils.utils import lbl_to_resumeset_multiproc
+    
+    # corpus = lbl_to_resumeset_multiproc(
+    #             TESTDIR, {}, disable=False, n_processes=10)

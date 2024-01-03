@@ -1,29 +1,31 @@
+from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc
+from . import base
+from itertools import product
 from typing import List, Tuple, Dict, Set
 from abc import ABC
 import pandas as pd
-import gensim
+import tqdm
+import multiprocessing
 import pickle
 import os
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
 import nltk
 import numpy as np
 
-nltk.download('punkt')
-
-from . import base
-from utils.utils import lbl_to_resumeset
 
 DEBUG_HEURISTIC = "This is a sample heuristic for now for debugging purposes"
 ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
 OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
-SAVED_MODEL="data/models/SavedModel.pickle"
+SAVED_DTMODEL = "data/models/SavedDTModel.pickle"
+SAVED_DOC2VEC = "data/models/Doc2Vec.pickle"
+
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -70,14 +72,36 @@ class TreeClassifier(base.AbstractClassifier):
         self._heuristic_ct = _heuristic_ct
         self._category = Category(category)
         self._include_keywords = consider_keywords
+        self._dt_doc2vec_model = None
+        self._dt_classifiers = None
 
         # self._heuristic_list = self._generate_heuristic_list(consider_keywords)
         # self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
-        win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, input, [], [], [])
-        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+        # win_list, loss_list, reasoning_list = self._traverse_with_input(
+        #     self._root, input, [], [], [])
+        # return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+
+        # Tokenize the new document
+        tokenized_new_doc = word_tokenize(input.lower())
+
+        # Create a TaggedDocument object for the new document
+        tagged_new_doc = TaggedDocument(
+            words=tokenized_new_doc, tags=['new_doc'])
+
+        # Infer the vector representation of the new document using the trained Doc2Vec model
+        inferred_vector = self._dt_doc2vec_model.infer_vector(
+            tagged_new_doc.words)
+
+        # Reshape the vector to match the input format of the decision tree classifier
+        inferred_vector = inferred_vector.reshape(1, -1)
+
+        # Use the trained decision tree classifier to predict the category of the new document. TODO can also return over ALL categories, depends on how many labels we need.
+        predicted_category = self._dt_classifiers[self._category].predict(inferred_vector)
+        print(predicted_category)
+
+        return True, ""
 
     def fit(self, dataset: str):
         """ 
@@ -85,26 +109,29 @@ class TreeClassifier(base.AbstractClassifier):
         context when choosing the final classification decision. 
         """
 
-        if not os.path.isfile(SAVED_MODEL):
-            corpus = lbl_to_resumeset(
-                dataset, {}, disable=False)
+        if not os.path.isfile(SAVED_DOC2VEC):
+            corpus = lbl_to_resumeset_multiproc(dataset, {}, disable=False, n_processes=35)
 
-        def __build_decision_tree(vector_size: int = 50, epochs: int = 40) -> DecisionTreeClassifier:
-            """ Returnes a trained Doc2Vec model """
-            
-            if os.path.isfile(SAVED_MODEL):
-                return pickle.load(open(SAVED_MODEL, "rb"))
-            
-            documents = corpus[self._category.name]
-            
-            # Tokenize the documents
-            tokenized_docs = [word_tokenize(doc.lower()) for doc in documents]
+        def __build_decision_tree(vector_size: int = 50, epochs: int = 100) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
+            """ 
+            This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
+            one for each category. If either models already exist in the proper directory, they will be loaded from disk.
+            """
 
-            # Create TaggedDocument objects
-            tagged_data = [TaggedDocument(words=doc, tags=[str(i)]) for i, doc in enumerate(tokenized_docs)]
+            if os.path.isfile(SAVED_DTMODEL) and os.path.isfile(SAVED_DOC2VEC):
+                return pickle.load(open(SAVED_DTMODEL, "rb")), pickle.load(open(SAVED_DOC2VEC, "rb"))
 
-            # Split the data into training and testing sets
-            X_train, X_test, y_train, y_test = train_test_split(tagged_data, [self._category.name for _ in tagged_data], test_size=0.2, random_state=42)
+            # Combine all labels for each document
+            print(corpus.keys())
+            tagged_data = []
+            for category, documents in corpus.items():
+                for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}"): # TODO multiprocess me
+                    tokenized_doc = word_tokenize(doc.lower())
+                    tags = [category]
+                    tagged_data.append(TaggedDocument(words=tokenized_doc, tags=tags))
+
+            #  Split the data into training and testing sets
+            X_train, X_test = train_test_split(tagged_data, test_size=0.2, random_state=42)
 
             # Train a Doc2Vec model
             vector_size = 50
@@ -114,21 +141,47 @@ class TreeClassifier(base.AbstractClassifier):
 
             # Transform the training data using the trained Doc2Vec model
             X_train_vectors = np.array([model.infer_vector(doc.words) for doc in X_train])
-            
-            dt_classifier = DecisionTreeClassifier()
-            dt_classifier.fit(X_train_vectors, y_train)
-            
+
+            # Train a separate binary classifier for each category
+            category_classifiers = {}
+            keys=corpus.keys()
+            for category in tqdm.tqdm(keys, desc=f"Training {len(keys)} decision trees"): # TODO multiprocess me?
+                # Extract binary labels for the current category
+                y_train = [1 if category in doc.tags else 0 for doc in X_train]
+
+                # Train a Decision Tree classifier
+                dt_classifier = DecisionTreeClassifier()
+                dt_classifier.fit(X_train_vectors, y_train)
+
+                category_classifiers[category] = dt_classifier
+
+            # Transform the testing data using the trained Doc2Vec model
             X_test_vectors = np.array([model.infer_vector(doc.words) for doc in X_test])
-            y_pred = dt_classifier.predict(X_test_vectors)
-            accuracy = accuracy_score(y_test, y_pred)
-            print("Accuracy on the test set:", accuracy)
-            
-            pickle.dump(model, open(SAVED_MODEL, 'wb'))
-            
-            return dt_classifier
-        
-        self._dt_classifier = __build_decision_tree()
-        
+
+            # Make predictions for each category
+            predictions = {}
+            for category, classifier in category_classifiers.items():
+                predictions[category] = classifier.predict(X_test_vectors)
+
+            # Evaluate the performance for each category
+            for category in corpus.keys():
+                y_true = [1 if category in doc.tags else 0 for doc in X_test]
+                y_pred = predictions[category]
+                accuracy = accuracy_score(y_true, y_pred)
+                report = classification_report(y_true, y_pred, target_names=['Not ' + category, category])
+                
+                print(f"Category: {category}")
+                print(f"Accuracy: {accuracy}")
+                print("Classification Report:\n", report)
+
+            for category, classifier in category_classifiers.items():
+                pickle.dump(dt_classifier, open(f"{SAVED_DTMODEL}-{category}", 'wb'))
+
+            pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
+
+            return category_classifiers, model
+
+        self._dt_classifiers, self._dt_doc2vec_model = __build_decision_tree()
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
