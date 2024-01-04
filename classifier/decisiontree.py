@@ -11,7 +11,6 @@ from random import shuffle
 import os
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -100,11 +99,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         manager = multiprocessing.Manager()
 
         def __perform_grid_search(rfs: Dict[str, RandomForestClassifier], X, y):
-            grid_space = {'max_depth': [3, 5, 10, None],
-                          'n_estimators': [10, 100, 200],
-                          'max_features': [1, 3, 5, 7],
-                          'min_samples_leaf': [1, 2, 3],
-                          'min_samples_split': [1, 2, 3]
+            grid_space = {'max_depth': [3, 5, 10, 15],
+                          'n_estimators': [10, 100, 200, 400, 500, 600],
+                          'max_features': [2, 3, 4, 5, 6, 7],
+                          'min_samples_leaf': [2, 3, 4, 5, 6],
+                          'min_samples_split': [2, 3, 4, 5, 6]
                           }
 
             def __single_grid_search(rf: RandomForestClassifier, category):
@@ -135,7 +134,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for proc in proccesses:
                 proc.join()
 
-        def __build_internal_classifier(vector_size: int = 50, epochs: int = 1, disable: bool = False) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
+        def __build_internal_classifier(vector_size: int = 50, epochs: int = 100, disable: bool = False) -> Tuple[Dict[str, RandomForestClassifier], Doc2Vec]:
             """ 
             This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
@@ -209,10 +208,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
                 category_classifiers[category] = rf_classifier
 
-            __perform_grid_search(category_classifiers,
-                                  X_train_vectors, y_train)
-            print("performed grid search")
-
             # Transform the testing data using the trained Doc2Vec model
             X_test_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(
                 X_test, desc="Inferring vectors for test set", disable=disable)])
@@ -249,6 +244,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                     f"{DATAMODELS}{SAVED_DTMODEL}-{category}", 'wb'))
             pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
 
+            print("performing grid search")
+            __perform_grid_search(category_classifiers,
+                                  X_train_vectors, y_train)
+            print("performed grid search")
+
             return category_classifiers, model
 
         self._rf_classifiers, self._dt_doc2vec_model = __build_internal_classifier()
@@ -266,7 +266,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             # Make prediction for each category
             prediction = classifier.predict([infer_vector])[0]
             predictions[category] = prediction
-        
+
         return predictions
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
