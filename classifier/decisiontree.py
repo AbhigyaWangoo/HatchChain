@@ -82,25 +82,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         # self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
-        # win_list, loss_list, reasoning_list = self._traverse_with_input(
-        #     self._root, input, [], [], [])
-        # return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+        win_list, loss_list, reasoning_list = self._traverse_with_input(
+            self._root, input, [], [], [])
+        predictions = self._generate_classifications(input=input)
 
-        if not self._rf_classifiers or not self._dt_doc2vec_model:
-            raise ValueError("Models not loaded. Call load_models() first.")
-
-        # Preprocess the input document
-        tokenized_doc = word_tokenize(input.lower())
-        infer_vector = self._dt_doc2vec_model.infer_vector(tokenized_doc)
-
-        predictions = {}
-        for category, classifier in self._rf_classifiers.items():
-            # Make prediction for each category
-            prediction = classifier.predict([infer_vector])[0]
-            predictions[category] = prediction
-
-        print(predictions)
-        return True, ""
+        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
 
     def fit(self, dataset: str):
         """ 
@@ -149,7 +135,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for proc in proccesses:
                 proc.join()
 
-        def __build_internal_classifier(vector_size: int = 50, epochs: int = 100, disable: bool = False) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
+        def __build_internal_classifier(vector_size: int = 50, epochs: int = 1, disable: bool = False) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
             """ 
             This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
@@ -198,7 +184,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             model.build_vocab(tagged_data)
             print("Built vocab")
 
-            # for _ in tqdm.tqdm(range(epochs), desc="Training Doc2Vec", disable=disable): # TODO one epoch takes like 200 seconds. this might be an overnight thing.
             shuffle(tagged_data)
             model.train(list(tagged_data),
                         total_examples=model.corpus_count, epochs=epochs)
@@ -267,6 +252,22 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return category_classifiers, model
 
         self._rf_classifiers, self._dt_doc2vec_model = __build_internal_classifier()
+
+    def _generate_classifications(self, input: str) -> Dict[str, int]:
+        if not self._rf_classifiers or not self._dt_doc2vec_model:
+            raise ValueError("Models not loaded. Call load_models() first.")
+
+        # Preprocess the input document
+        tokenized_doc = word_tokenize(input.lower())
+        infer_vector = self._dt_doc2vec_model.infer_vector(tokenized_doc)
+
+        predictions = {}
+        for category, classifier in self._rf_classifiers.items():
+            # Make prediction for each category
+            prediction = classifier.predict([infer_vector])[0]
+            predictions[category] = prediction
+        
+        return predictions
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
