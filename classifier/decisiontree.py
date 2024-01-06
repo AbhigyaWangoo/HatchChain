@@ -1,29 +1,34 @@
+from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
+from . import base
+from itertools import product
 from typing import List, Tuple, Dict, Set
 from abc import ABC
 import pandas as pd
-import gensim
+import tqdm
+import multiprocessing
 import pickle
+from random import shuffle
 import os
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
 import nltk
 import numpy as np
 
-nltk.download('punkt')
-
-from . import base
-from utils.utils import lbl_to_resumeset
 
 DEBUG_HEURISTIC = "This is a sample heuristic for now for debugging purposes"
 ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
 OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
-SAVED_MODEL="data/models/SavedModel.pickle"
+SAVED_DTMODEL = "SavedDTModel"
+SAVED_DOC2VEC = "data/models/Doc2Vec"
+
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -54,7 +59,7 @@ class Node(ABC):
         self.hyperparameter_level = level
 
 
-class TreeClassifier(base.AbstractClassifier):
+class ExplainableTreeClassifier(base.AbstractClassifier):
     """ 
     A classifier loosely based on the Decision tree classifier. Meant to be 
     more explainable in nature that a traditional decision tree. We construct the 
@@ -70,14 +75,32 @@ class TreeClassifier(base.AbstractClassifier):
         self._heuristic_ct = _heuristic_ct
         self._category = Category(category)
         self._include_keywords = consider_keywords
+        self._dt_doc2vec_model = None
+        self._rf_classifiers = None
 
         # self._heuristic_list = self._generate_heuristic_list(consider_keywords)
         # self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
-        win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, input, [], [], [])
-        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+        # win_list, loss_list, reasoning_list = self._traverse_with_input(
+        #     self._root, input, [], [], [])
+        # return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+
+        if not self._rf_classifiers or not self._dt_doc2vec_model:
+            raise ValueError("Models not loaded. Call load_models() first.")
+
+        # Preprocess the input document
+        tokenized_doc = word_tokenize(input.lower())
+        infer_vector = self._dt_doc2vec_model.infer_vector(tokenized_doc)
+
+        predictions = {}
+        for category, classifier in self._rf_classifiers.items():
+            # Make prediction for each category
+            prediction = classifier.predict([infer_vector])[0]
+            predictions[category] = prediction
+
+        print(predictions)
+        return True, ""
 
     def fit(self, dataset: str):
         """ 
@@ -85,50 +108,165 @@ class TreeClassifier(base.AbstractClassifier):
         context when choosing the final classification decision. 
         """
 
-        if not os.path.isfile(SAVED_MODEL):
-            corpus = lbl_to_resumeset(
-                dataset, {}, disable=False)
+        if not os.path.isfile(SAVED_DOC2VEC):
+            corpus = lbl_to_resumeset_multiproc(dataset, set(), disable=False)
 
-        def __build_decision_tree(vector_size: int = 50, epochs: int = 40) -> DecisionTreeClassifier:
-            """ Returnes a trained Doc2Vec model """
-            
-            if os.path.isfile(SAVED_MODEL):
-                return pickle.load(open(SAVED_MODEL, "rb"))
-            
-            documents = corpus[self._category.name]
-            
-            # Tokenize the documents
-            tokenized_docs = [word_tokenize(doc.lower()) for doc in documents]
+        manager = multiprocessing.Manager()
 
-            # Create TaggedDocument objects
-            tagged_data = [TaggedDocument(words=doc, tags=[str(i)]) for i, doc in enumerate(tokenized_docs)]
+        def __perform_grid_search(rfs: Dict[str, RandomForestClassifier], X, y):
+            grid_space = {'max_depth': [3, 5, 10, None],
+                          'n_estimators': [10, 100, 200],
+                          'max_features': [1, 3, 5, 7],
+                          'min_samples_leaf': [1, 2, 3],
+                          'min_samples_split': [1, 2, 3]
+                          }
 
-            # Split the data into training and testing sets
-            X_train, X_test, y_train, y_test = train_test_split(tagged_data, [self._category.name for _ in tagged_data], test_size=0.2, random_state=42)
+            def __single_grid_search(rf: RandomForestClassifier, category):
+                print(f"Performing grid search on {category} classifier")
+                grid = GridSearchCV(rf, param_grid=grid_space,
+                                    cv=3, scoring='accuracy', n_jobs=2)
+                model_grid = grid.fit(X, y)
+
+                with open(f"{category}-gsrch") as fp:
+                    print(
+                        f'Best hyperparameters for {category} are: {str(model_grid.best_params_)}')
+                    fp.write(
+                        f'Best hyperparameters for {category} are: {str(model_grid.best_params_)}\n')
+                    print(
+                        f'Best score for {category} is: {str(model_grid.best_score_)}')
+                    fp.write(
+                        f'Best score for {category} is: {str(model_grid.best_score_)}\n')
+
+            proccesses = []
+            for label in rfs:
+                classifier = rfs[label]
+                print(f"running grid search on label {label}")
+                p = multiprocessing.Process(
+                    target=__single_grid_search, args=(classifier, label))
+                proccesses.append(p)
+                p.start()
+
+            for proc in proccesses:
+                proc.join()
+
+        def __build_internal_classifier(vector_size: int = 50, epochs: int = 100, disable: bool = False) -> Tuple[Dict[str, DecisionTreeClassifier], Doc2Vec]:
+            """ 
+            This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
+            one for each category. If either models already exist in the proper directory, they will be loaded from disk.
+            """
+
+            if os.path.isfile(SAVED_DOC2VEC):
+                model_files = os.listdir(DATAMODELS)
+
+                category_classifiers = {}
+                for mfile in model_files:
+                    splitted_file = mfile.split("-")
+
+                    if len(splitted_file) > 1 and splitted_file[0] == SAVED_DTMODEL:
+                        category_classifiers[splitted_file[-1]
+                                             ] = pickle.load(open(F"{DATAMODELS}{mfile}", "rb"))
+
+                return category_classifiers, pickle.load(open(SAVED_DOC2VEC, "rb"))
+
+            def __tag_documents(category: str, documents, tagged_data):
+                for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}", disable=disable):
+                    tokenized_doc = word_tokenize(doc.lower())
+                    tags = [category]
+                    tagged_data.append(TaggedDocument(
+                        words=tokenized_doc, tags=tags))
+
+            # Combine all labels for each document
+            tagged_data = manager.list()
+            proccesses = []
+            for category, documents in corpus.items():
+                p = multiprocessing.Process(
+                    target=__tag_documents, args=(category, documents, tagged_data))
+                proccesses.append(p)
+                p.start()
+
+            for proc in proccesses:
+                proc.join()
+
+            #  Split the data into training and testing sets
+            X_train, X_test = train_test_split(
+                tagged_data, test_size=0.2, random_state=42)
 
             # Train a Doc2Vec model
-            vector_size = 50
-            model = Doc2Vec(vector_size=vector_size, window=2, min_count=1, workers=4, epochs=100)
+            model = Doc2Vec(vector_size=vector_size,
+                            window=2, min_count=1, workers=4)
+            print("Training Doc2Vec model with corpus")
             model.build_vocab(tagged_data)
-            model.train(tagged_data, total_examples=model.corpus_count, epochs=model.epochs)
+            print("Built vocab")
+
+            # for _ in tqdm.tqdm(range(epochs), desc="Training Doc2Vec", disable=disable): # TODO one epoch takes like 200 seconds. this might be an overnight thing.
+            shuffle(tagged_data)
+            model.train(list(tagged_data),
+                        total_examples=model.corpus_count, epochs=epochs)
+
+            print("Trained Doc2Vec Model")
 
             # Transform the training data using the trained Doc2Vec model
-            X_train_vectors = np.array([model.infer_vector(doc.words) for doc in X_train])
-            
-            dt_classifier = DecisionTreeClassifier()
-            dt_classifier.fit(X_train_vectors, y_train)
-            
-            X_test_vectors = np.array([model.infer_vector(doc.words) for doc in X_test])
-            y_pred = dt_classifier.predict(X_test_vectors)
-            accuracy = accuracy_score(y_test, y_pred)
-            print("Accuracy on the test set:", accuracy)
-            
-            pickle.dump(model, open(SAVED_MODEL, 'wb'))
-            
-            return dt_classifier
-        
-        self._dt_classifier = __build_decision_tree()
-        
+            X_train_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(
+                X_train, desc="Inferring vectors from dataset", disable=disable)])
+            print("transformed training data")
+
+            # Train a separate binary classifier for each category
+            category_classifiers = {}
+            keys = corpus.keys()
+            for category in tqdm.tqdm(keys, desc=f"Training {len(keys)} decision trees", disable=disable):
+                # Extract binary labels for the current category
+                y_train = [1 if category in doc.tags else 0 for doc in X_train]
+
+                # Train a Decision Tree classifier
+                rf_classifier = RandomForestClassifier()
+                # dt_classifier = DecisionTreeClassifier()
+                rf_classifier.fit(X_train_vectors, y_train)
+
+                category_classifiers[category] = rf_classifier
+
+            __perform_grid_search(category_classifiers,
+                                  X_train_vectors, y_train)
+            print("performed grid search")
+
+            # Transform the testing data using the trained Doc2Vec model
+            X_test_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(
+                X_test, desc="Inferring vectors for test set", disable=disable)])
+
+            # Make predictions for each category
+            predictions = {}
+            for category, classifier in tqdm.tqdm(category_classifiers.items(), desc="Classifying test set", disable=disable):
+                predictions[category] = classifier.predict(X_test_vectors)
+
+            # Evaluate the performance for each category
+            for category in corpus.keys():
+                y_true = [1 if category in doc.tags else 0 for doc in X_test]
+                y_pred = predictions[category]
+                accuracy = accuracy_score(y_true, y_pred)
+                report = classification_report(y_true, y_pred, target_names=[
+                                               'Not ' + category, category])
+
+                try:
+                    with open("rf_classifier_report.txt", "a") as fp:
+                        print(f"Category: {category}")
+                        fp.write(f"Category: {category}\n")
+
+                        print(f"Accuracy: {accuracy}")
+                        fp.write(f"Accuracy: {accuracy}\n")
+
+                        print(f"Classification Report:\n {report}")
+                        fp.write(f"Classification Report:\n {report}\n")
+                except Exception as e:
+                    print(
+                        f"Error saving dt classifier report data to file: {e}")
+
+            for category, classifier in category_classifiers.items():
+                pickle.dump(rf_classifier, open(
+                    f"{DATAMODELS}{SAVED_DTMODEL}-{category}", 'wb'))
+            pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
+
+            return category_classifiers, model
+
+        self._rf_classifiers, self._dt_doc2vec_model = __build_internal_classifier()
 
     def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """

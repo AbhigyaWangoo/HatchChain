@@ -1,0 +1,120 @@
+Category: Database_Administrator
+Accuracy: 0.9148092179826218
+Classification Report:
+                             precision    recall  f1-score   support
+
+Not Database_Administrator       0.96      0.95      0.95      9928
+    Database_Administrator       0.34      0.39      0.36       660
+
+                  accuracy                           0.91     10588
+                 macro avg       0.65      0.67      0.66     10588
+              weighted avg       0.92      0.91      0.92     10588
+
+Category: Project_manager
+Accuracy: 0.8670192670948244
+Classification Report:
+                      precision    recall  f1-score   support
+
+Not Project_manager       0.93      0.92      0.93      9673
+    Project_manager       0.25      0.27      0.26       915
+
+           accuracy                           0.87     10588
+          macro avg       0.59      0.60      0.59     10588
+       weighted avg       0.87      0.87      0.87     10588
+
+Category: Network_Administrator
+Accuracy: 0.86768039289762
+Classification Report:
+                            precision    recall  f1-score   support
+
+Not Network_Administrator       0.93      0.92      0.93      9694
+    Network_Administrator       0.23      0.25      0.24       894
+
+                 accuracy                           0.87     10588
+                macro avg       0.58      0.59      0.58     10588
+             weighted avg       0.87      0.87      0.87     10588
+
+Category: Systems_Administrator
+Accuracy: 0.8214960332451833
+Classification Report:
+                            precision    recall  f1-score   support
+
+Not Systems_Administrator       0.90      0.89      0.90      9378
+    Systems_Administrator       0.24      0.26      0.25      1210
+
+                 accuracy                           0.82     10588
+                macro avg       0.57      0.58      0.58     10588
+             weighted avg       0.83      0.82      0.82     10588
+
+Category: Software_Developer
+Accuracy: 0.6364752550056668
+Classification Report:
+                         precision    recall  f1-score   support
+
+Not Software_Developer       0.75      0.74      0.75      7606
+    Software_Developer       0.36      0.37      0.36      2982
+
+              accuracy                           0.64     10588
+             macro avg       0.55      0.55      0.55     10588
+          weighted avg       0.64      0.64      0.64     10588
+
+Category: Front_End_Developer
+Accuracy: 0.8654136758594635
+Classification Report:
+                          precision    recall  f1-score   support
+
+Not Front_End_Developer       0.93      0.92      0.93      9809
+    Front_End_Developer       0.14      0.16      0.15       779
+
+               accuracy                           0.87     10588
+              macro avg       0.54      0.54      0.54     10588
+           weighted avg       0.87      0.87      0.87     10588
+
+Category: Security_Analyst
+Accuracy: 0.9097091046467699
+Classification Report:
+                       precision    recall  f1-score   support
+
+Not Security_Analyst       0.96      0.95      0.95      9981
+    Security_Analyst       0.25      0.29      0.27       607
+
+            accuracy                           0.91     10588
+           macro avg       0.60      0.62      0.61     10588
+        weighted avg       0.92      0.91      0.91     10588
+
+Category: Web_Developer
+Accuracy: 0.789100868908198
+Classification Report:
+                    precision    recall  f1-score   support
+
+Not Web_Developer       0.89      0.87      0.88      9312
+    Web_Developer       0.17      0.18      0.17      1276
+
+         accuracy                           0.79     10588
+        macro avg       0.53      0.53      0.53     10588
+     weighted avg       0.80      0.79      0.79     10588
+
+Category: Python_Developer
+Accuracy: 0.9084812995844352
+Classification Report:
+                       precision    recall  f1-score   support
+
+Not Python_Developer       0.95      0.95      0.95      9987
+    Python_Developer       0.22      0.24      0.23       601
+
+            accuracy                           0.91     10588
+           macro avg       0.59      0.59      0.59     10588
+        weighted avg       0.91      0.91      0.91     10588
+
+Category: Java_Developer
+Accuracy: 0.9045145447676615
+Classification Report:
+                     precision    recall  f1-score   support
+
+Not Java_Developer       0.95      0.95      0.95      9924
+    Java_Developer       0.25      0.26      0.25       664
+
+          accuracy                           0.90     10588
+         macro avg       0.60      0.60      0.60     10588
+      weighted avg       0.91      0.90      0.91     10588
+

@@ -3,3 +3,4 @@ openai
 scikit-learn
 pandas
 spacy
+typeguard

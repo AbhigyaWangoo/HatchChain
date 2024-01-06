@@ -1,12 +1,11 @@
-from classifier.decisiontree import TreeClassifier
+from classifier.decisiontree import ExplainableTreeClassifier
 import openai
-import chardet
 import os
+import pickle
 from typing import Dict, Set, List
-from utils.utils import read_from, TESTDIR
 
-LABELS = {'Database_Administrator', 'Project_manager',  'Java_Developer', 'Python_Developer',
-          'Software_Developer', 'Web_Developer', 'Systems_Administrator', 'Network_Administrator'}
+from nltk.tokenize import word_tokenize
+from utils.utils import read_from, TESTDIR, LABELS
 
 client = openai.OpenAI()
 
@@ -32,7 +31,7 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
             for lbl_line in LABELS:
                 try:
-                    classifier = TreeClassifier(
+                    classifier = ExplainableTreeClassifier(
                         ["Experiences", "Skills"], lbl_line)
                     decision, reason = classifier.classify(data)
 
@@ -59,9 +58,5 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    tree = TreeClassifier(["Experiences", "skills"], "Network_Administrator")
+    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
     tree.fit(TESTDIR)
-    # tree.print_tree()
-    # run_binclassifier(TESTDIR, 10)
-
-    # classification, res = tree.classify(data)

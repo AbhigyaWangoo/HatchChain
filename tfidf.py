@@ -1,7 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 import pandas as pd
 from typing import List, Dict
-from main import TESTDIR, read_from, LABELS
+from utils.utils import read_from, TESTDIR, LABELS
 import os
 from tqdm import tqdm
 import spacy
