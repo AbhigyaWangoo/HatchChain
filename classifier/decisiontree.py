@@ -67,6 +67,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     """
 
     def __init__(self, hyperparams: List[str], category: str, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
+        super().__init__(hyperparams)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
             self._hyperparam_lst.append(HyperParameter(param))
@@ -77,13 +78,13 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         self._dt_doc2vec_model = None
         self._rf_classifiers = None
 
-        # self._heuristic_list = self._generate_heuristic_list(consider_keywords)
-        # self._root = self._construct_tree(root=None, idx=0)
+        self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+        self._root = self._construct_tree(root=None, idx=0)
 
     def classify(self, input: str) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
             self._root, input, [], [], [])
-        predictions = self._generate_classifications(input=input)
+        # predictions = self._generate_classifications(input=input)
 
         return len(win_list) > len(loss_list), ' '.join(reasoning_list)
 
@@ -134,7 +135,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for proc in proccesses:
                 proc.join()
 
-        def __build_internal_classifier(vector_size: int = 50, epochs: int = 100, disable: bool = False) -> Tuple[Dict[str, RandomForestClassifier], Doc2Vec]:
+        def __build_internal_classifier(vector_size: int = 50, epochs: int = 1, disable: bool = False) -> Tuple[Dict[str, RandomForestClassifier], Doc2Vec]:
             """ 
             This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
@@ -325,7 +326,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             being in this category.
             """
 
-            heuristic = self._prompt_gpt(heuristic_prompt)
+            # heuristic = self._prompt_gpt(heuristic_prompt)
+            heuristic = self._prompt_hatch_persona(heuristic_prompt)
             heuristics.append(heuristic)
 
         if consider_keywords:

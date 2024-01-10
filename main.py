@@ -6,6 +6,7 @@ from typing import Dict, Set, List
 
 from nltk.tokenize import word_tokenize
 from utils.utils import read_from, TESTDIR, LABELS
+from memgpt import MemGPT
 
 client = openai.OpenAI()
 
@@ -56,7 +57,7 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     print(f"FINAL accuracy= {s/total}\r")
     return file_to_lbl
 
-
 if __name__ == "__main__":
     tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
-    tree.fit(TESTDIR)
+    # tree.fit(TESTDIR)
+    tree.print_tree()
