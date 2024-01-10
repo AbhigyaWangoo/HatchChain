@@ -1,7 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 import pandas as pd
 from typing import List, Dict
-from utils.utils import read_from, TESTDIR, LABELS
+from utils.utils import read_from, DATA_DIR, LABELS
 import os
 from tqdm import tqdm
 import spacy
@@ -85,10 +85,10 @@ def get_top_terms(dataset_dir: str, categroy: str) -> Dict[str, float]:
 def create_category_csvs(category_list: List[str], dir_path: str, n:int=25):
     for category in category_list:
         if n < 0:
-            dataframe = get_top_terms(TESTDIR, category)
+            dataframe = get_top_terms(DATA_DIR, category)
             dataframe.to_csv(f"{dir_path}{category}-full.csv")
         else:
-            dataframe = get_top_n_terms(TESTDIR, category, n)
+            dataframe = get_top_n_terms(DATA_DIR, category, n)
             dataframe.to_csv(f"{dir_path}{category}-{n}.csv")
 
 create_category_csvs(LABELS, "data/", -1)
