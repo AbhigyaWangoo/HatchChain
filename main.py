@@ -60,8 +60,8 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     return file_to_lbl
 
 if __name__ == "__main__":
-    runpod_client = runpod.RunPodClient()
-    print(runpod_client.query("What can you tell me about george washington?"))
-    # tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
+    # runpod_client = runpod.RunPodClient()
+    # print(runpod_client.query("Hello, how are you?", False))
+    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
     # tree.fit(TESTDIR)
-    # tree.print_tree()
+    tree.print_tree()

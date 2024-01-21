@@ -10,6 +10,7 @@ from enum import Enum
 RUN_ENDPOINT="run"
 RUNSYNC_ENDPOINT="runsync"
 
+OUTPUT='output'
 TEXT='text'
 STATUS='status'
 
@@ -95,4 +96,4 @@ class RunPodClient(base.AbstractLLM):
         if full_resp:
             return response_json
 
-        return response_json[TEXT]
+        return response_json[OUTPUT][TEXT]

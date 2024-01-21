@@ -297,7 +297,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
-        res = self._prompt_gpt(navigation_str)
+        res = self._prompt_runpod(navigation_str)
         reasoning = res.split(":")[-1]
         reject_ct = res.lower().count("reject")
         accept_ct = res.lower().count("accept")
@@ -326,8 +326,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             being in this category.
             """
 
-            # heuristic = self._prompt_gpt(heuristic_prompt)
-            heuristic = self._prompt_hatch_persona(heuristic_prompt)
+            heuristic = self._prompt_runpod(heuristic_prompt)
             heuristics.append(heuristic)
 
         if consider_keywords:
