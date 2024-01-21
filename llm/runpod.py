@@ -5,10 +5,18 @@ import json
 import os
 from dotenv import load_dotenv
 from urllib.parse import urljoin
+from enum import Enum
 
 RUN_ENDPOINT="run"
 RUNSYNC_ENDPOINT="runsync"
- 
+
+TEXT='text'
+STATUS='status'
+
+class RunPodStatus(Enum):
+    IN_QUEUE = 'IN_QUEUE'
+    COMPLETED = 'COMPLETED'
+
 class RunPodClient(base.AbstractLLM):
     def __init__(self) -> None:
         super().__init__()
@@ -38,18 +46,14 @@ class RunPodClient(base.AbstractLLM):
 
         return True
 
-    def query(self, prompt: str, is_async: bool = False) -> str:
+    def query(self, prompt: str, full_resp: bool=False) -> str:
         """
         Creates and routes a llama2 job for the runpod 
         serverless instance. Returns the response to the runpod op.
         """
 
-        if is_async:
-            url = urljoin(self._model_endpoint, RUNSYNC_ENDPOINT)
-            timeout = 100
-        else:
-            url = urljoin(self._model_endpoint, RUN_ENDPOINT)
-            timeout = 5
+        timeout = 100
+        url = urljoin(self._model_endpoint, RUNSYNC_ENDPOINT)
 
         headers = {
             "Authorization": str(self._key),
@@ -76,14 +80,19 @@ class RunPodClient(base.AbstractLLM):
                 f"Sending prompt to llama model failed, code: {response.status_code}")
             return
 
+        # Loading the response from the runpod instance
         response_json = json.loads(response.text)
-        if is_async:
+
+        status = RunPodStatus(response_json[STATUS])
+        status_url = urljoin(self._model_endpoint, f"/{STATUS}/{response_json['id']}")
+
+        while status == RunPodStatus.IN_QUEUE:
+            time.sleep(1)
+            resp=requests.get(status_url, headers=headers, timeout=1)
+            response_json = json.loads(resp.text)
+            status=response_json[STATUS]
+
+        if full_resp:
             return response_json
 
-        # TODO async is not properly reading via stream. Need to modify
-        # to keep reading until stream is finished
-        status_url = urljoin(self._model_endpoint, f"stream/{response_json['id']}")
-        for _ in range(10):
-            time.sleep(1)
-            get_status = requests.get(status_url, headers=headers, timeout=5)
-            print(get_status.text)
+        return response_json[TEXT]

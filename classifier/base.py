@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from openai import OpenAI
 from memgpt import MemGPT
-from ..llm import gpt, memgpt
+from llm import gpt, memgpt
 
 class AbstractClassifier(ABC):
     def __init__(self, hyperparams: List[str]) -> None:

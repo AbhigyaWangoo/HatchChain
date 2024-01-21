@@ -1,9 +1,11 @@
+import requests
 from classifier.decisiontree import ExplainableTreeClassifier
 import openai
 import os
 import pickle
 from typing import Dict, Set, List
 
+from llm import runpod
 from nltk.tokenize import word_tokenize
 from utils.utils import read_from, TESTDIR, LABELS
 from memgpt import MemGPT
@@ -58,6 +60,8 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     return file_to_lbl
 
 if __name__ == "__main__":
-    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
+    runpod_client = runpod.RunPodClient()
+    print(runpod_client.query("What can you tell me about george washington?"))
+    # tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator")
     # tree.fit(TESTDIR)
-    tree.print_tree()
+    # tree.print_tree()
