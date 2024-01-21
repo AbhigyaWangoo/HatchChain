@@ -6,3 +6,4 @@ spacy
 typeguard
 gensim
 pymemgpt
+tqdm
