@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
-from openai import OpenAI
-from memgpt import MemGPT
+from typing import List, Dict, Any, Union
 from llm import gpt, memgpt, runpod
 
 class AbstractClassifier(ABC):
@@ -14,6 +12,16 @@ class AbstractClassifier(ABC):
 
     @abstractmethod
     def classify(self, input: str) -> str:
+        pass
+
+    @abstractmethod
+    def save_model(self, path: str) -> Dict[Any, Any]:
+        """ Saves the model to file, and returns the json created and saved to the file. """
+        pass
+
+    @abstractmethod
+    def load_model(self, path: str):
+        """ Reads the model from the provided file into the current instance """
         pass
 
     def _prompt_gpt(self, prompt: str, engine: str = "gpt-3.5-turbo-16k", temperature: int = 0.2) -> str:

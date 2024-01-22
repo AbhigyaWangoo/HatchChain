@@ -1,7 +1,7 @@
 from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
 from . import base
-from itertools import product
-from typing import List, Tuple, Dict, Set
+import json
+from typing import Any, List, Tuple, Dict, Set, Union
 from abc import ABC
 import pandas as pd
 import tqdm
@@ -17,9 +17,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
 import nltk
+import enum
 import numpy as np
 
-
+EMPTY_STRING=""
 DEBUG_HEURISTIC = "This is a sample heuristic for now for debugging purposes"
 ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
@@ -27,6 +28,25 @@ OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
 SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
+
+
+class SavedModelFields(enum.Enum):
+    HEURISTIC_LIST = "heuristics"
+    DEPTH = "depth"
+    HEURISTIC_COUNT = "heuristic_ct"
+    CATEGORY = "category"
+    HYPERPARAMETER_LIST = "hyperparam_lst"
+
+# data["heuristics"] = self._heuristic_list
+# data['depth']= self._depth
+# data['heuristic_ct']= self._heuristic_ct
+# data['category']= self._category.name
+# data['include_keywords']= self._include_keywords
+# data['rf_classifiers']= self._rf_classifiers
+# list_str=[]
+# for hyperparam in self._hyperparam_lst:
+#     list_str.append(hyperparam.name)
+# data["hyperparam_lst"]=list_str
 
 
 class Category():
@@ -66,7 +86,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     contain classifications.
     """
 
-    def __init__(self, hyperparams: List[str], category: str, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
+    def __init__(self, hyperparams: List[str], category: str, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
         super().__init__(hyperparams)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
@@ -78,8 +98,60 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         self._dt_doc2vec_model = None
         self._rf_classifiers = None
 
-        self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+        if load_file != EMPTY_STRING:
+            self.load_model(load_file)
+        else:
+            self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+
         self._root = self._construct_tree(root=None, idx=0)
+
+    def save_model(self, path: str) -> Dict[Any, Any]:
+        mode = "w"
+        if not os.path.exists(path):
+            mode = "a"
+
+        data = {}
+        # Data to save
+        # 1. Heuristic List
+        data[SavedModelFields.HEURISTIC_LIST] = self._heuristic_list
+
+        # 2. primitave vars
+        data[SavedModelFields.DEPTH] = self._depth
+        data[SavedModelFields.HEURISTIC_COUNT] = self._heuristic_ct
+        data[SavedModelFields.CATEGORY] = self._category.name
+        # data['include_keywords']= self._include_keywords
+
+        # 3. hyperparam list
+        list_str = []
+        for hyperparam in self._hyperparam_lst:
+            list_str.append(hyperparam.name)
+        data[SavedModelFields.HYPERPARAMETER_LIST] = list_str
+
+        # 4. (AFTERWARDS, integrate the tfidf and deterministic dt)
+        # data['rf_classifiers']= self._rf_classifiers
+        # data['dt_doc2vec_model']= self._dt_doc2vec_model
+
+        with open(path, mode, encoding="utf8") as fp:
+            json.dump(data, fp)
+
+    def load_model(self, path: str) -> Dict[Any, Any] | None:
+        if not os.path.exists(path):
+            print(f"Path {path} does not exist. Please feed in a correct path.")
+            return None
+
+        with open(path, "r", encoding="utf8") as fp:
+            data = json.load(fp)
+            self._heuristic_list = data[SavedModelFields.HEURISTIC_LIST.value]
+            # TODO defaulting to false for now to only consider recruiter passed in keywords.
+            self._include_keywords = False
+            self._depth = data[SavedModelFields.DEPTH.value]
+            self._heuristic_ct = data[SavedModelFields.HEURISTIC_COUNT.value]
+            self._category = data[SavedModelFields.CATEGORY.value]
+
+            list_str = data[SavedModelFields.HYPERPARAMETER_LIST.value]
+            self._hyperparam_lst = []
+            for hyperparam in list_str:
+                self._hyperparam_lst.append(HyperParameter(hyperparam))
 
     def classify(self, input: str) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
