@@ -156,6 +156,7 @@ def create_classifier_sync(job_id: int):
     create_classifier_wrapper(job_id)
     return {"message": "Classifcation complete, job tables should be updated with classifier metadata"}
 
+
 @app.get("/create-classification")
 def create_classification(job_id: int, resume_id: int):
     """ 
@@ -167,9 +168,25 @@ def create_classification(job_id: int, resume_id: int):
     """
 
     # 1. Get classifier based on job id
+    classifier = get_classifier(job_id, False)
+
     # 2. get resume from db, and classify resume
+    client = postgres_client.PostgresClient(job_id)
+    candidate_metadata = client.read_candidate(
+        resume_id, postgres_client.RESUME_DATA_FIELD)
+    strdata = json.dumps(candidate_metadata)
+
+    accept, reasoning = classifier.classify(strdata)
+
     # 3. set job_resumes explanation field
-    return {"message": "This endpoint has not been implemented..."}
+    client.update_job(postgres_client.CLASSIFIER_DATA_FIELD, reasoning)
+
+    # 4. Return metadata and success message
+    return {
+        "reccommendation": accept,
+        'reasoning': reasoning,
+        'message': f'Successfully classified and added reasoning to job table for job id {job_id}'
+    }
 
 
 if __name__ == "__main__":
