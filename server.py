@@ -130,6 +130,7 @@ def create_classifier_wrapper(job_id: int):
         # 2. Once classifier framework is constructed, read it from the file, and place data back into db.
         set_classifier(job_id, saved_model)
 
+
 def create_classification_wrapper(job_id: int, resume_id: int):
     """ 
     This function creates a classification for the resume data provided by the resume id
@@ -140,30 +141,39 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     resume_id: id to classify
     """
 
-    # 1. Get classifier based on job id
-    classifier = get_classifier(job_id, False)
-
-    # 2. get resume from db, and classify resume
+    # 1. get resume from db, and classify resume
     client = postgres_client.PostgresClient(job_id)
-    candidate_metadata = client.read_candidate(
-        resume_id, postgres_client.RESUME_DATA_FIELD)
-    strdata = json.dumps(candidate_metadata)
 
-    accept, reasoning = classifier.classify(strdata)
+    # 2. TODO add disk level caching for classification reasoning?
+    dbcached = client.read_job_resume(
+        resume_id, postgres_client.CLASSIFICATION_DATA_FIELD, postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
+    accept, reasoning = dbcached[0], dbcached[1]
 
-    # 3. set job_resumes explanation field
-    db_update = {
-        "explainable_classification": accept,
-        "explainable_classification_reasoning" : reasoning
-    }
-    client.update_job_resume(resume_id, **db_update)
+    if accept is None or reasoning is None:
+        print("First time classifying candidate.")
 
-    # 4. Return metadata and success message
+        # 3. Reading client metadata
+        candidate_metadata = client.read_candidate(
+            resume_id, postgres_client.RESUME_DATA_FIELD)
+        strdata = json.dumps(candidate_metadata)
+
+        classifier = get_classifier(job_id, False)
+        accept, reasoning = classifier.classify(strdata)
+
+        # 4. set job_resumes explanation field, if not run before
+        db_update = {
+            postgres_client.CLASSIFICATION_DATA_FIELD: accept,
+            postgres_client.CLASSIFICATION_REASONING_DATA_FIELD: reasoning
+        }
+        client.update_job_resume(resume_id, **db_update)
+
+    # 5. Return metadata and success message
     return {
         "reccommendation": accept,
         'reasoning': reasoning,
         'message': f'Successfully classified and added reasoning to job table for job id {job_id}'
     }
+
 
 @app.get("/create-classifier")
 def create_classifier(job_id: int, background_tasks: BackgroundTasks):
@@ -190,6 +200,7 @@ def create_classifier_sync(job_id: int):
     create_classifier_wrapper(job_id)
     return {"message": "Classifcation complete, job tables should be updated with classifier metadata"}
 
+
 @app.get("/create-classification-sync")
 def create_classification_sync(job_id: int, resume_id: int):
     """ 
@@ -200,6 +211,7 @@ def create_classification_sync(job_id: int, resume_id: int):
     resume_id: id to classify
     """
     return create_classification_wrapper(job_id, resume_id)
+
 
 @app.get("/create-classification")
 def create_classification(job_id: int, resume_id: int, background_tasks: BackgroundTasks):
@@ -216,6 +228,7 @@ def create_classification(job_id: int, resume_id: int, background_tasks: Backgro
         'reasoning': "",
         'message': f'Started background task for classification of resume {resume_id} under job {job_id}'
     }
+
 
 if __name__ == "__main__":
     if EXPLAINABLE_CLASSIFIER_ENDPOINT is None:
