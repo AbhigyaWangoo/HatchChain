@@ -20,7 +20,7 @@ import nltk
 import enum
 import numpy as np
 
-EMPTY_STRING=""
+EMPTY_STRING = ""
 DEBUG_HEURISTIC = "This is a sample heuristic for now for debugging purposes"
 ROOT = "ROOT"
 KEYWORD_HEURISTIC = "Relevant Keywords"
@@ -36,6 +36,7 @@ class SavedModelFields(enum.Enum):
     HEURISTIC_COUNT = "heuristic_ct"
     CATEGORY = "category"
     HYPERPARAMETER_LIST = "hyperparam_lst"
+
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -90,7 +91,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             self.load_model(load_file)
         else:
             # print("Generating heuristic list in classifier.")
-            self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+            self._heuristic_list = self._generate_heuristic_list(
+                consider_keywords)
             # print("Generated!")
 
         self._root = self._construct_tree(root=None, idx=0)
@@ -136,7 +138,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             self._include_keywords = False
             self._depth = data[SavedModelFields.DEPTH.value]
             self._heuristic_ct = data[SavedModelFields.HEURISTIC_COUNT.value]
-            self._category = data[SavedModelFields.CATEGORY.value]
+            self._category = Category(data[SavedModelFields.CATEGORY.value])
 
             list_str = data[SavedModelFields.HYPERPARAMETER_LIST.value]
             self._hyperparam_lst = []
@@ -350,21 +352,34 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return win_lst, loss_lst, reasoning_lst
 
-    def _navigate(self, node: Node, input: str) -> Tuple[bool, str]:
+    def _navigate(self, node: Node, input_str: str, max_retry: int = 0) -> Tuple[bool, str]:
         navigation_str = f"""
         You have a candidate and a label. On the bases of the following information
-        here: {node.heuristic} decide whether the following candidate: {input} fits the category 
+        here: {node.heuristic} decide whether the following candidate: {input_str} fits the category 
         of {self._category.name}. Your output should always be modelled as follows:
 
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
         res = self._prompt_runpod(navigation_str)
-        reasoning = res.split(":")[-1]
-        reject_ct = res.lower().count("reject")
-        accept_ct = res.lower().count("accept")
+        try:
+            reasoning = res.split(":")[-1]
 
-        return accept_ct > reject_ct, reasoning
+            reject_ct = res.lower().count("reject")
+            accept_ct = res.lower().count("accept")
+
+            return accept_ct > reject_ct, reasoning
+        except Exception as e:
+            error_str = f"""
+                Error reading information from navigation. Nav response for 
+                node {node.heuristic}: {res}.\n\nError: {e}. Retrying..
+            """
+
+            if max_retry > 0:
+                print(error_str)
+                return self._navigate(node, input_str)
+
+            raise error_str
 
     def _generate_heuristic_list(self, consider_keywords: bool) -> List[str]:
         heuristics = []
