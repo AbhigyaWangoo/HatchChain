@@ -169,6 +169,7 @@ def create_classification(job_id: int, resume_id: int):
     # 1. Get classifier based on job id
     # 2. get resume from db, and classify resume
     # 3. set job_resumes explanation field
+    return {"message": "This endpoint has not been implemented..."}
 
 
 if __name__ == "__main__":
