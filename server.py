@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from query_engine.src.db import postgres_client
 from classifier import decisiontree
 import enum
@@ -116,13 +116,9 @@ def set_classifier(job_id: int, classifier_metadata: str):
     print("updated job")
 
 
-@app.get("/create-classifier")
-def create_classifier(job_id: int):
-    """ 
-    This endpoint retreives the data required from the relevant job, and passes it to the classifier
-    to construct a json file. Then, it uploads said file to the pgres table's job table.
-
-    job_id: id to construct tree for.
+def create_classifier_wrapper(job_id: int):
+    """
+    A wrapper for the creation of a classifier. see the endpoint /create-classifier for more info.
     """
 
     # 1. If classifier has been made before, just return (check local, if not, check db). Otherwise, feed the category into classifier
@@ -134,6 +130,31 @@ def create_classifier(job_id: int):
         # 2. Once classifier framework is constructed, read it from the file, and place data back into db.
         set_classifier(job_id, saved_model)
 
+
+@app.get("/create-classifier")
+def create_classifier(job_id: int, background_tasks: BackgroundTasks):
+    """ 
+    This endpoint retreives the data required from the relevant job, and passes it to the classifier
+    to construct a json file. Then, it uploads said file to the pgres table's job table.
+
+    job_id: id to construct tree for.
+    """
+
+    background_tasks.add_task(create_classifier_wrapper, job_id)
+    return {"message": "Classifier creation task has been added to background tasks."}
+
+
+@app.get("/create-classifier-sync")
+def create_classifier_sync(job_id: int):
+    """ 
+    The synchronus equivalent of creating a classifier for the provided job. See the 
+    /create-classifierfor more info
+
+    job_id: id to construct tree for.
+    """
+
+    create_classifier_wrapper(job_id)
+    return {"message": "Classifcation complete, job tables should be updated with classifier metadata"}
 
 @app.get("/create-classification")
 def create_classification(job_id: int, resume_id: int):
