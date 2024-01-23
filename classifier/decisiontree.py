@@ -37,18 +37,6 @@ class SavedModelFields(enum.Enum):
     CATEGORY = "category"
     HYPERPARAMETER_LIST = "hyperparam_lst"
 
-# data["heuristics"] = self._heuristic_list
-# data['depth']= self._depth
-# data['heuristic_ct']= self._heuristic_ct
-# data['category']= self._category.name
-# data['include_keywords']= self._include_keywords
-# data['rf_classifiers']= self._rf_classifiers
-# list_str=[]
-# for hyperparam in self._hyperparam_lst:
-#     list_str.append(hyperparam.name)
-# data["hyperparam_lst"]=list_str
-
-
 class Category():
     def __init__(self, name: str) -> None:
         self.name = name
@@ -101,7 +89,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         if load_file != EMPTY_STRING:
             self.load_model(load_file)
         else:
+            # print("Generating heuristic list in classifier.")
             self._heuristic_list = self._generate_heuristic_list(consider_keywords)
+            # print("Generated!")
 
         self._root = self._construct_tree(root=None, idx=0)
 
@@ -113,26 +103,26 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         data = {}
         # Data to save
         # 1. Heuristic List
-        data[SavedModelFields.HEURISTIC_LIST] = self._heuristic_list
+        data[SavedModelFields.HEURISTIC_LIST.value] = self._heuristic_list
 
         # 2. primitave vars
-        data[SavedModelFields.DEPTH] = self._depth
-        data[SavedModelFields.HEURISTIC_COUNT] = self._heuristic_ct
-        data[SavedModelFields.CATEGORY] = self._category.name
+        data[SavedModelFields.DEPTH.value] = self._depth
+        data[SavedModelFields.HEURISTIC_COUNT.value] = self._heuristic_ct
+        data[SavedModelFields.CATEGORY.value] = self._category.name
         # data['include_keywords']= self._include_keywords
 
         # 3. hyperparam list
         list_str = []
         for hyperparam in self._hyperparam_lst:
             list_str.append(hyperparam.name)
-        data[SavedModelFields.HYPERPARAMETER_LIST] = list_str
+        data[SavedModelFields.HYPERPARAMETER_LIST.value] = list_str
 
         # 4. (AFTERWARDS, integrate the tfidf and deterministic dt)
         # data['rf_classifiers']= self._rf_classifiers
         # data['dt_doc2vec_model']= self._dt_doc2vec_model
 
         with open(path, mode, encoding="utf8") as fp:
-            json.dump(data, fp)
+            fp.write(json.dumps(data))
 
     def load_model(self, path: str) -> Dict[Any, Any] | None:
         if not os.path.exists(path):

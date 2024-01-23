@@ -1,0 +1,3 @@
+[submodule "query_engine"]
+	path = query_engine
+	url = https://github.com/HatchDevOrg/Hatch-query-engine.git
