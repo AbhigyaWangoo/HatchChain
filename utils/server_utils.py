@@ -8,10 +8,12 @@ import os
 SERVER_ROOT_DATAPATH = "data/server/"
 if not os.path.exists(SERVER_ROOT_DATAPATH):
     os.mkdir(SERVER_ROOT_DATAPATH)
-    
+
 CLASSIFIERS_ROOT_DATAPATH = "data/classifiers/"
 if not os.path.exists(CLASSIFIERS_ROOT_DATAPATH):
     os.mkdir(CLASSIFIERS_ROOT_DATAPATH)
+
+active_classifications = set()
 
 
 class HyperparamEnum(enum.Enum):
@@ -132,12 +134,25 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     resume_id: id to classify
     """
 
-    # 1. get resume from db, and classify resume
+    if (job_id, resume_id) in active_classifications:
+        return {
+            "reccommendation": False,
+            'reasoning': "",
+            'message': f'''There is already an active classification 
+                occurring on resume {resume_id} for job {job_id}'''
+        }
+
+    active_classifications.add((job_id, resume_id))
+
+    # 1. declare client
     client = postgres_client.PostgresClient(job_id)
 
-    # 2. TODO add disk level caching for classification reasoning?
+    # 2. Try to read prev job_resume binding.
+    # TODO add disk level caching for classification reasoning?
     dbcached = client.read_job_resume(
-        resume_id, postgres_client.CLASSIFICATION_DATA_FIELD, postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
+        resume_id,
+        postgres_client.CLASSIFICATION_DATA_FIELD,
+        postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
     accept, reasoning = dbcached[0], dbcached[1]
 
     if accept is None or reasoning is None:
@@ -159,6 +174,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
         client.update_job_resume(resume_id, **db_update)
 
     # 5. Return metadata and success message
+    active_classifications.remove((job_id, resume_id))
     return {
         "reccommendation": accept,
         'reasoning': reasoning,

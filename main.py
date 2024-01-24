@@ -1,4 +1,4 @@
-import requests
+from query_engine.src.db import postgres_client
 from classifier.decisiontree import ExplainableTreeClassifier
 import openai
 import os
@@ -62,8 +62,12 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 if __name__ == "__main__":
     # runpod_client = runpod.RunPodClient()
     # print(runpod_client.query("Hello, how are you?", False))
-    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator", "local.json")
+    # tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator", "local.json")
 
     # tree.fit(TESTDIR)
-    tree.print_tree()
+    # tree.print_tree()
     # tree.save_model("local.json")
+
+    client = postgres_client.PostgresClient(1)
+    ags = {"explainable_classification" : False, "explainable_classification_reasoning": "kys"}
+    client.update_job_resume(9, **ags)
