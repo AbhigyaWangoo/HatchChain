@@ -7,3 +7,4 @@ typeguard
 gensim
 pymemgpt
 tqdm
+psycopg2-binary

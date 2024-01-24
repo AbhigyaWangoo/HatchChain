@@ -96,4 +96,7 @@ class RunPodClient(base.AbstractLLM):
         if full_resp:
             return response_json
 
+        if isinstance(response_json[OUTPUT][TEXT], list):
+            return response_json[OUTPUT][TEXT][0]
+
         return response_json[OUTPUT][TEXT]
