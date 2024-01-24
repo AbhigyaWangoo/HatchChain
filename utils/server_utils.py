@@ -144,39 +144,51 @@ def create_classification_wrapper(job_id: int, resume_id: int):
 
     active_classifications.add((job_id, resume_id))
 
-    # 1. declare client
-    client = postgres_client.PostgresClient(job_id)
+    try:
+        # 1. declare client
+        client = postgres_client.PostgresClient(job_id)
 
-    # 2. Try to read prev job_resume binding.
-    # TODO add disk level caching for classification reasoning?
-    dbcached = client.read_job_resume(
-        resume_id,
-        postgres_client.CLASSIFICATION_DATA_FIELD,
-        postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
-    accept, reasoning = dbcached[0], dbcached[1]
+        # 2. Try to read prev job_resume binding.
+        # TODO add disk level caching for classification reasoning?
+        dbcached = client.read_job_resume(
+            resume_id,
+            postgres_client.CLASSIFICATION_DATA_FIELD,
+            postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
+        accept, reasoning = dbcached[0], dbcached[1]
 
-    if accept is None or reasoning is None:
-        print("First time classifying candidate.")
+        if accept is None or reasoning is None:
+            print("First time classifying candidate.")
 
-        # 3. Reading client metadata
-        candidate_metadata = client.read_candidate(
-            resume_id, postgres_client.RESUME_DATA_FIELD)
-        strdata = json.dumps(candidate_metadata)
+            # 3. Reading client metadata
+            candidate_metadata = client.read_candidate(
+                resume_id, postgres_client.RESUME_DATA_FIELD)
+            strdata = json.dumps(candidate_metadata)
 
-        classifier = get_classifier(job_id, False)
-        accept, reasoning = classifier.classify(strdata)
+            classifier = get_classifier(job_id, False)
+            accept, reasoning = classifier.classify(strdata)
 
-        # 4. set job_resumes explanation field, if not run before
-        db_update = {
-            postgres_client.CLASSIFICATION_DATA_FIELD: accept,
-            postgres_client.CLASSIFICATION_REASONING_DATA_FIELD: reasoning
+            # 4. set job_resumes explanation field, if not run before
+            db_update = {
+                postgres_client.CLASSIFICATION_DATA_FIELD: accept,
+                postgres_client.CLASSIFICATION_REASONING_DATA_FIELD: reasoning
+            }
+            client.update_job_resume(resume_id, **db_update)
+
+        # 5. Return metadata and success message
+        active_classifications.remove((job_id, resume_id))
+        return {
+            "reccommendation": accept,
+            'reasoning': reasoning,
+            'message': f'Successfully classified and added reasoning to job table for job id {job_id}'
         }
-        client.update_job_resume(resume_id, **db_update)
 
-    # 5. Return metadata and success message
-    active_classifications.remove((job_id, resume_id))
-    return {
-        "reccommendation": accept,
-        'reasoning': reasoning,
-        'message': f'Successfully classified and added reasoning to job table for job id {job_id}'
-    }
+    except Exception as e:
+        active_classifications.remove((job_id, resume_id))
+        err_msg=f"Classification on resume {resume_id} failed, error: {e}"
+        # print(err_msg)
+
+        return {
+            "reccommendation": False,
+            'reasoning': "",
+            'message': err_msg
+        }
