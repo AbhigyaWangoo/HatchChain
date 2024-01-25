@@ -90,11 +90,15 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
 
         if save_new_dt:
             classifier.save_model(classifier_path)
+        
+        active_classifiers.remove(job_id)
+
+        return classifier
     except Exception as e:
-        print(f"Classifier creation on job {job_id} failed, error: {e}")
+        active_classifiers.remove(job_id)
+        # print(f"Classifier creation on job {job_id} failed, error: {e}")
+        return f"Classifier creation on job {job_id} failed, error: {e}"
     
-    active_classifiers.remove(job_id)
-    return classifier
 
 
 def set_classifier(job_id: int, classifier_metadata: str):
