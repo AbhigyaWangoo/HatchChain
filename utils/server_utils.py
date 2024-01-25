@@ -2,7 +2,7 @@ from query_engine.src.db import postgres_client
 from classifier import decisiontree
 import enum
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Union
 import os
 
 SERVER_ROOT_DATAPATH = "data/server/"
@@ -14,7 +14,7 @@ if not os.path.exists(CLASSIFIERS_ROOT_DATAPATH):
     os.mkdir(CLASSIFIERS_ROOT_DATAPATH)
 
 active_classifications = set()
-
+active_classifiers = set()
 
 class HyperparamEnum(enum.Enum):
     EXPERIENCE = "Experiences"
@@ -45,7 +45,7 @@ def get_job_metadata(job_id: int) -> Dict[Any, Any]:
     return job_metadata
 
 
-def get_classifier(job_id: int, save_new_dt: bool = True) -> decisiontree.ExplainableTreeClassifier:
+def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decisiontree.ExplainableTreeClassifier]:
     """
     This function either loads a classifier from local disk, or creates a new one 
     if the classifier has never been created. By default, it will save all newly made
@@ -55,10 +55,13 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> decisiontree.Explai
     save_new_dt: Whether or not to save a newly constructed classifier to disk or not.
     """
 
+    if job_id in active_classifiers:
+        return f"job {job_id} already has a classifier being created for it. Exiting this call..."
+
     # Read job data
     job_metadata = get_job_metadata(job_id)
     if job_metadata == {}:
-        return {"Success": False, "Message": f"Could not find job metadata for job {job_id} in local disk or db"}
+        return f"job {job_id} already has a classifier being created for it. Exiting this call..."
 
     classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
 
@@ -75,17 +78,22 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> decisiontree.Explai
         with open(classifier_path, "w", encoding="utf8") as fp:
             fp.write(json.dumps(classifier_metadata))
 
-    # Never seen classifier before, need to create new one
-    hyperparams = [HyperparamEnum.SKILLS.value,
-                   HyperparamEnum.EXPERIENCE.value]
-    category = job_metadata['title']
-    # TODO basic classifier without keywords. Need to up accuracy.
-    classifier = decisiontree.ExplainableTreeClassifier(
-        hyperparams, category, consider_keywords=False)
+    try:
+        active_classifiers.add(job_id)
+        # Never seen classifier before, need to create new one
+        hyperparams = [HyperparamEnum.SKILLS.value,
+                    HyperparamEnum.EXPERIENCE.value]
+        category = job_metadata['title']
+        # TODO basic classifier without keywords. Need to up accuracy.
+        classifier = decisiontree.ExplainableTreeClassifier(
+            hyperparams, category, consider_keywords=False)
 
-    if save_new_dt:
-        classifier.save_model(classifier_path)
-
+        if save_new_dt:
+            classifier.save_model(classifier_path)
+    except Exception as e:
+        print(f"Classifier creation on job {job_id} failed, error: {e}")
+    
+    active_classifiers.remove(job_id)
     return classifier
 
 
@@ -115,13 +123,17 @@ def create_classifier_wrapper(job_id: int):
     """
 
     # 1. If classifier has been made before, just return (check local, if not, check db). Otherwise, feed the category into classifier
-    get_classifier(job_id)
-    classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
-    with open(classifier_path, "r", encoding="utf8") as fp:
-        saved_model = json.loads(fp.read())
+    res = get_classifier(job_id)
 
-        # 2. Once classifier framework is constructed, read it from the file, and place data back into db.
-        set_classifier(job_id, saved_model)
+    if isinstance(res, str):
+        print(res)
+    else:
+        classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
+        with open(classifier_path, "r", encoding="utf8") as fp:
+            saved_model = json.loads(fp.read())
+
+            # 2. Once classifier framework is constructed, read it from the file, and place data back into db.
+            set_classifier(job_id, saved_model)
 
 
 def create_classification_wrapper(job_id: int, resume_id: int):
@@ -135,11 +147,13 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     """
 
     if (job_id, resume_id) in active_classifications:
+        duplicate_msg=f'''There is already an active classification 
+                occurring on resume {resume_id} for job {job_id}'''
+        # print(duplicate_msg)
         return {
             "reccommendation": False,
             'reasoning': "",
-            'message': f'''There is already an active classification 
-                occurring on resume {resume_id} for job {job_id}'''
+            'message': duplicate_msg
         }
 
     active_classifications.add((job_id, resume_id))
