@@ -1,4 +1,5 @@
 from query_engine.src.db import postgres_client
+import multiprocessing
 from classifier import decisiontree
 import enum
 import json
@@ -15,6 +16,8 @@ if not os.path.exists(CLASSIFIERS_ROOT_DATAPATH):
 
 active_classifications = set()
 active_classifiers = set()
+
+classifier_condition=multiprocessing.Condition()
 
 class HyperparamEnum(enum.Enum):
     EXPERIENCE = "Experiences"
@@ -92,6 +95,7 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
             classifier.save_model(classifier_path)
         
         active_classifiers.remove(job_id)
+        classifier_condition.notify()
 
         return classifier
     except Exception as e:
@@ -159,6 +163,9 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             'reasoning': "",
             'message': duplicate_msg
         }
+    while job_id in active_classifiers:
+        with classifier_condition:
+            classifier_condition.wait()
 
     active_classifications.add((job_id, resume_id))
 
