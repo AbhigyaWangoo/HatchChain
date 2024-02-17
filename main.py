@@ -12,6 +12,7 @@ from memgpt import MemGPT
 
 client = openai.OpenAI()
 
+
 def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     """ 
     Returns a dict of {filename: label}
@@ -62,13 +63,10 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 if __name__ == "__main__":
     # runpod_client = runpod.RunPodClient()
     # print(runpod_client.query("Hello, how are you?", False))
-    tree = ExplainableTreeClassifier(["Experiences", "skills"], "Database_Administrator", "local.json")
-    print(tree.get_k_similar(152, 2186, 3, True))
-
-    # tree.fit(TESTDIR)
-    # tree.print_tree()
-    # tree.save_model("local.json")
-
-    # client = postgres_client.PostgresClient(1)
-    # ags = {"explainable_classification" : False, "explainable_classification_reasoning": "kys"}
-    # client.update_job_resume(9, **ags)
+    tree = ExplainableTreeClassifier(["Experiences", "skills"],
+                                     "Database_Administrator", "local.json")
+    # similar_dict = tree.get_k_similar(152, 2186, 3, True)
+    # for key in similar_dict:
+    #     print(key)
+    #     print(similar_dict[key])
+    res = tree.tiebreak(2186, 152, [])
