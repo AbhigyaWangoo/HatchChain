@@ -33,7 +33,16 @@ OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
 SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
+NAME="name"
 
+class ResumeModel():
+    def __init__(self, id: int, name: str, raw_data: str=None, json_data: Dict[Any, Any]=None, vector: List[int]=None, explainable_classification: bool=None) -> None:
+        self.id=id
+        self.name=name
+        self.raw_data=raw_data
+        self.json_data=json_data
+        self.vector=vector
+        self.explainable_classification=explainable_classification
 
 class SavedModelFields(enum.Enum):
     HEURISTIC_LIST = "heuristics"
@@ -155,7 +164,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for hyperparam in list_str:
                 self._hyperparam_lst.append(HyperParameter(hyperparam))
 
-    def get_k_similar(self, job_id: int, resume_id: int, k: int, raw: bool = True) -> OrderedDict[int, Tuple[bool, str]]:
+    def get_k_similar(self, job_id: int, resume_id: int, k: int, raw: bool = True) -> OrderedDict[int, ResumeModel]:
         """ 
         This function gets the top k similar resumes from the db and 
         returns their metadata. It will return either the full raw text, or the 
@@ -210,29 +219,31 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         # retrieved earlier from postgres
         if raw:
             txt_client = rawtxt_client.ResumeDynamoClient(job_id)
+            pgres_client = postgres_client.PostgresClient(job_id)
+            
+            resume_data=pgres_client.read_candidate(resume_id, postgres_client.RESUME_DATA_FIELD)[0]
             raw_txt_data = txt_client.batch_get_resume(
                 list(vectors.keys()), "", save_to_file=False, return_txt=True)
 
             # 5. Return list (in order of closest) with raw text
             for vec in vectors:
-                vectors[vec] = (classifications[vec], raw_txt_data[vec])
+                vectors[vec]=ResumeModel(id=vec, name=resume_data[NAME], raw_data=raw_txt_data[vec], vector=vectors[vec], explainable_classification=classifications[vec])
 
         return vectors
 
-    def classify(self, input: str, resume_id: int = None, job_id: int = None) -> Tuple[bool, str]:
+    def classify(self, resume_input: str, resume_id: int = None, job_id: int = None) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, input, [], [], [])
+            self._root, resume_input, [], [], [])
         # predictions = self._generate_classifications(input=input)
 
         if resume_id is not None and job_id is not None and abs(len(win_list) - len(loss_list)) <= 1:
-            tiebreaker, final_reasoning_list = self.tiebreak(
-                resume_id, job_id, reasoning_list)
+            tiebreaker = self.tiebreak(resume_id, job_id)
 
             return tiebreaker, ' '.join(reasoning_list)
 
         return len(win_list) > len(loss_list), ' '.join(reasoning_list)
 
-    def tiebreak(self, resume_id: int, job_id: int, reasoning_list: List[str]) -> Tuple[bool,  List[str]]:
+    def tiebreak(self, resume_id: int, job_id: int) -> bool:
         """
         This is the tiebreaker function. If the |wincount - losscount| <= 1, this function
         will decide whether to push the candidate into or out of the pool depending on
@@ -240,7 +251,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         resume_id: id of the resume to fetch
         job_id: id of the job the resume belongs to
-        reasoning_list: a list of the provided reasonings.
         """
 
         # 1. call top k function
@@ -250,25 +260,21 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         similar_resumes = self.get_k_similar(
             job_id, resume_id, k=NUM_SIMILAR, raw=True)
 
-        num_accept=0
-        total=0
+        num_accept = 0
+        total = 0
         for resume_id in similar_resumes:
-            if similar_resumes[resume_id][0] is not None:
-                total+=1
-                if similar_resumes[resume_id][0]:
-                    num_accept+=1
-
-        
-
-        print(num_accept)
-        print(total)
+            if similar_resumes[resume_id].explainable_classification is not None:
+                total += 1
+                if similar_resumes[resume_id].explainable_classification:
+                    num_accept += 1
 
         # 3. Reshape reasoning list depending on a) whether we're accepting or
-        
-        
         # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.
+        if total:
+            return num_accept/total >= .5
 
-        return True
+        raise ValueError(
+            f"Resume {resume_id}'s top k candidates don't have set classifications. Considering increasing k to find classified candidates")
 
     def fit(self, dataset: str):
         """ 
