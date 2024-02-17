@@ -1,6 +1,6 @@
 from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
 from similarity.cosine import CosineSimilarity
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from . import base
 import json
 from typing import Any, List, Tuple, Dict, Set, Union
@@ -155,7 +155,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for hyperparam in list_str:
                 self._hyperparam_lst.append(HyperParameter(hyperparam))
 
-    def get_k_similar(self, job_id: int, resume_id: int, k: int, raw: bool=True) -> List[Any]:
+    def get_k_similar(self, job_id: int, resume_id: int, k: int, raw: bool=True) -> OrderedDict[int, str]:
         """ 
         This function gets the top k similar resumes from the db and 
         returns their metadata. It will return either the full raw text, or the 
@@ -197,16 +197,17 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         this_vector = np.array(res_vector)
 
         # 3. get top k resume ids.
-        vectors = similarity_calculator.top_k(this_vector, vectors, 3)
+        vectors = similarity_calculator.top_k(this_vector, vectors, k)
 
         # 4. Use ddb client to retrive from raw text store, or just return jsons
         # retrieved earlier from postgres
-        txt_client = rawtxt_client.ResumeDynamoClient(job_id)
-        raw_txt_data = txt_client.batch_get_resume(list(vectors.keys()), "", save_to_file=False, return_txt=True)
+        if raw:
+            txt_client = rawtxt_client.ResumeDynamoClient(job_id)
+            raw_txt_data = txt_client.batch_get_resume(list(vectors.keys()), "", save_to_file=False, return_txt=True)
 
-        # 5. Return list (in order of closest) with raw text
-        for vec in vectors:
-            vectors[vec] = raw_txt_data[vec]
+            # 5. Return list (in order of closest) with raw text
+            for vec in vectors:
+                vectors[vec] = raw_txt_data[vec]
 
         return vectors
 
@@ -235,7 +236,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         # 1. call top k function
         NUM_SIMILAR=5
-        similar_resumes = get_k_similar(job_id, resume_id, NUM_SIMILAR)
+        similar_resumes = self.get_k_similar(job_id, resume_id, k=NUM_SIMILAR, raw=True)
+
         # 2. find top k resumes, and find majority acceptance rate
         # 3. Reshape reasoning list depending on a) whether we're accepting or 
         # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.

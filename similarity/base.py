@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from numpy import ndarray, argsort
 from typing import Dict
 
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 # Ideally this should be evaluating HatchVectors not ndarrays. That requires us to make a Vector parent class, with
 # JobVector and ResumeVector children classes. Not doin allat rn tho.
