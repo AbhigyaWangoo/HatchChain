@@ -1,5 +1,6 @@
 from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
 from similarity.cosine import CosineSimilarity
+from ordereddict import OrderedDict
 from . import base
 import json
 from typing import Any, List, Tuple, Dict, Set, Union
@@ -18,7 +19,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
 
-from query_engine.src.db import postgres_client
+from query_engine.src.db import postgres_client, rawtxt_client
 
 
 import enum
@@ -200,9 +201,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         # 4. Use ddb client to retrive from raw text store, or just return jsons
         # retrieved earlier from postgres
-        # 5. Return list (in order of closest) with 
+        txt_client = rawtxt_client.ResumeDynamoClient(job_id)
+        raw_txt_data = txt_client.batch_get_resume(list(vectors.keys()), "", save_to_file=False, return_txt=True)
 
-        return rv
+        # 5. Return list (in order of closest) with raw text
+        for vec in vectors:
+            vectors[vec] = raw_txt_data[vec]
+
+        return vectors
 
     def classify(self, input: str, resume_id: int = None, job_id: int = None) -> Tuple[bool, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(

@@ -2,6 +2,8 @@ from abc import abstractmethod, ABC
 from numpy import ndarray, argsort
 from typing import Dict
 
+from ordereddict import OrderedDict
+
 # Ideally this should be evaluating HatchVectors not ndarrays. That requires us to make a Vector parent class, with
 # JobVector and ResumeVector children classes. Not doin allat rn tho.
 
@@ -14,7 +16,7 @@ class Similarity(ABC):
     def compute_similarity(self, doc1: ndarray, doc2: ndarray) -> float:
         pass
 
-    def top_k(self, v1: ndarray, v_dict: Dict[int, ndarray], k: int) -> Dict[int, ndarray]:
+    def top_k(self, v1: ndarray, v_dict: Dict[int, ndarray], k: int) -> OrderedDict[int, ndarray]:
         # Ensure the input vector is not empty
         if len(v1) == 0:
             raise ValueError("Input vector cannot be empty")
@@ -31,4 +33,4 @@ class Similarity(ABC):
         top_k_vectors = {key: v_dict[key]
                          for key in list(sorted_similarities.keys())[:k]}
 
-        return top_k_vectors
+        return OrderedDict(top_k_vectors)
