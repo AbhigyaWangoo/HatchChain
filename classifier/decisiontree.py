@@ -51,6 +51,10 @@ class SavedModelFields(enum.Enum):
     CATEGORY = "category"
     HYPERPARAMETER_LIST = "hyperparam_lst"
 
+class ClassificationOutput(enum.Enum):
+    ACCEPT=0
+    REJECT=0
+    TIE=0
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -164,117 +168,18 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for hyperparam in list_str:
                 self._hyperparam_lst.append(HyperParameter(hyperparam))
 
-    def get_k_similar(self, job_id: int, resume_id: int, k: int, raw: bool = True) -> OrderedDict[int, ResumeModel]:
-        """ 
-        This function gets the top k similar resumes from the db and 
-        returns their metadata. It will return either the full raw text, or the 
-        vectors, dependant on the 'raw' flag.
-
-        job_id: int
-        resume_id: int
-        k: int
-        raw: bool
-
-        returns: A dict of resume_id: (explainable classification, raw text value)
-        """
-        rv = []
-
-        # 1. Fetch all resume vectors for job id provided. Place into {res_id: vector} dict.
-        client = postgres_client.PostgresClient(job_id)
-        resumes = client.read_candidates_from_job("", False, True)
-
-        if len(resumes) == 0:
-            print("No candidates associated with the job. cant get K similar candidates")
-            return rv
-
-        vectors = {}
-        classifications = {}
-        res_vector = None
-        for resume in resumes:
-            res_id = resume[0]
-
-            res = client.read_job_resume(
-                res_id, postgres_client.VECTOR_DATA_FIELD, postgres_client.CLASSIFICATION_DATA_FIELD)
-            vec = res[0]
-            classification = res[1]
-
-            if int(res_id) == resume_id:
-                res_vector = vec
-            else:
-                vectors[res_id] = vec
-                classifications[res_id] = classification
-
-        if res_vector == None:
-            print("Could not find this resume's vector. Aborting for now.")
-            return rv
-
-        # 2. Calc cosine similarity with provided resume id and all others.
-        similarity_calculator = CosineSimilarity()
-        this_vector = np.array(res_vector)
-
-        # 3. get top k resume ids.
-        vectors = similarity_calculator.top_k(this_vector, vectors, k)
-
-        # 4. Use ddb client to retrive from raw text store, or just return jsons
-        # retrieved earlier from postgres
-        if raw:
-            txt_client = rawtxt_client.ResumeDynamoClient(job_id)
-            pgres_client = postgres_client.PostgresClient(job_id)
-            
-            resume_data=pgres_client.read_candidate(resume_id, postgres_client.RESUME_DATA_FIELD)[0]
-            raw_txt_data = txt_client.batch_get_resume(
-                list(vectors.keys()), "", save_to_file=False, return_txt=True)
-
-            # 5. Return list (in order of closest) with raw text
-            for vec in vectors:
-                vectors[vec]=ResumeModel(id=vec, name=resume_data[NAME], raw_data=raw_txt_data[vec], vector=vectors[vec], explainable_classification=classifications[vec])
-
-        return vectors
-
-    def classify(self, resume_input: str, resume_id: int = None, job_id: int = None) -> Tuple[bool, str]:
+    def classify(self, resume_input: str, resume_id: int = None, job_id: int = None) -> Tuple[ClassificationOutput, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
             self._root, resume_input, [], [], [])
         # predictions = self._generate_classifications(input=input)
+        reasonings_str=' '.join(reasoning_list)
 
         if resume_id is not None and job_id is not None and abs(len(win_list) - len(loss_list)) <= 1:
-            tiebreaker = self.tiebreak(resume_id, job_id)
+            return ClassificationOutput.TIE, reasonings_str
+        elif len(win_list) > len(loss_list):
+            return ClassificationOutput.ACCEPT, reasonings_str
 
-            return tiebreaker, ' '.join(reasoning_list)
-
-        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
-
-    def tiebreak(self, resume_id: int, job_id: int) -> bool:
-        """
-        This is the tiebreaker function. If the |wincount - losscount| <= 1, this function
-        will decide whether to push the candidate into or out of the pool depending on
-        the k nearest neighbors, and whether a majority of them would be accepted or rejected.
-
-        resume_id: id of the resume to fetch
-        job_id: id of the job the resume belongs to
-        """
-
-        # 1. call top k function
-        NUM_SIMILAR = 5
-
-        # 2. find top k resumes, and find majority acceptance rate
-        similar_resumes = self.get_k_similar(
-            job_id, resume_id, k=NUM_SIMILAR, raw=True)
-
-        num_accept = 0
-        total = 0
-        for resume_id in similar_resumes:
-            if similar_resumes[resume_id].explainable_classification is not None:
-                total += 1
-                if similar_resumes[resume_id].explainable_classification:
-                    num_accept += 1
-
-        # 3. Reshape reasoning list depending on a) whether we're accepting or
-        # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.
-        if total:
-            return num_accept/total >= .5
-
-        raise ValueError(
-            f"Resume {resume_id}'s top k candidates don't have set classifications. Considering increasing k to find classified candidates")
+        return ClassificationOutput.REJECT, reasonings_str
 
     def fit(self, dataset: str):
         """ 
