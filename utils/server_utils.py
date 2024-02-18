@@ -82,24 +82,26 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
             fp.write(json.dumps(classifier_metadata))
 
     try:
-        active_classifiers.add(job_id)
-        # Never seen classifier before, need to create new one
-        hyperparams = [HyperparamEnum.SKILLS.value,
-                    HyperparamEnum.EXPERIENCE.value]
-        category = job_metadata['title']
-        # TODO basic classifier without keywords. Need to up accuracy.
-        classifier = decisiontree.ExplainableTreeClassifier(
-            hyperparams, category, consider_keywords=False)
+        with classifier_condition:
+            active_classifiers.add(job_id)
+            # Never seen classifier before, need to create new one
+            hyperparams = [HyperparamEnum.SKILLS.value,
+                        HyperparamEnum.EXPERIENCE.value]
+            category = job_metadata['title']
+            # TODO basic classifier without keywords. Need to up accuracy.
+            classifier = decisiontree.ExplainableTreeClassifier(
+                hyperparams, category, consider_keywords=False)
 
-        if save_new_dt:
-            classifier.save_model(classifier_path)
-        
-        active_classifiers.remove(job_id)
-        classifier_condition.notify()
+            if save_new_dt:
+                classifier.save_model(classifier_path)
+
+            active_classifiers.remove(job_id)
+            classifier_condition.notify()
 
         return classifier
     except Exception as e:
-        active_classifiers.remove(job_id)
+        if job_id in active_classifiers:
+            active_classifiers.remove(job_id)
         # print(f"Classifier creation on job {job_id} failed, error: {e}")
         return f"Classifier creation on job {job_id} failed, error: {e}"
     
@@ -190,7 +192,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
-            accept, reasoning = classifier.classify(strdata)
+            accept, reasoning = classifier.classify(strdata, resume_id, job_id)
 
             # 4. set job_resumes explanation field, if not run before
             db_update = {
