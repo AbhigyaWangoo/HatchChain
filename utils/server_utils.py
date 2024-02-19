@@ -23,6 +23,7 @@ active_classifiers = set()
 
 classifier_condition = multiprocessing.Condition()
 
+
 class HyperparamEnum(enum.Enum):
     EXPERIENCE = "Experiences"
     SKILLS = "Skills"
@@ -90,7 +91,8 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
             active_classifiers.add(job_id)
             # Never seen classifier before, need to create new one
             hyperparams = [HyperparamEnum.SKILLS.value,
-                           HyperparamEnum.EXPERIENCE.value]
+                           HyperparamEnum.EXPERIENCE.value,
+                           HyperparamEnum.EDUCATION.value]
             category = job_metadata['title']
             # TODO basic classifier without keywords. Need to up accuracy.
             classifier = decisiontree.ExplainableTreeClassifier(
@@ -196,11 +198,18 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
-            accept, reasoning = classifier.classify(strdata, resume_id, job_id)
+            accept, reasoning = classifier.classify(strdata)
 
             if accept == decisiontree.ClassificationOutput.TIE:
                 print(f"Running tiebreaker on resume {resume_id}")
-                accept = tiebreak(resume_id, job_id)
+                res = tiebreak(resume_id, job_id)
+
+                if res == decisiontree.ClassificationOutput.TIE:
+                    # Conditional wait
+                    accept=False # TODO remove me
+                    pass
+                else:
+                    accept = res == decisiontree.ClassificationOutput.ACCEPT
 
             # 4. set job_resumes explanation field, if not run before
             db_update = {
@@ -231,6 +240,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
 def get_k_similar(job_id: int,
                   resume_id: int,
                   k: int,
+                  threshold: float = 0.55,
                   raw: bool = True) -> OrderedDict[int, decisiontree.ResumeModel]:
     """ 
     This function gets the top k similar resumes from the db and 
@@ -294,14 +304,25 @@ def get_k_similar(job_id: int,
             list(vectors.keys()), "", save_to_file=False, return_txt=True)
 
         # 5. Return list (in order of closest) with raw text
+        final_dict = {}
         for vec in vectors:
-            vectors[vec] = decisiontree.ResumeModel(id=vec, name=resume_data[decisiontree.NAME],
-                                                    raw_data=raw_txt_data[vec], vector=vectors[vec], explainable_classification=classifications[vec])
+            sim=similarity_calculator.compute_similarity(this_vector, np.array(vectors[vec]))
+
+            print(f"Similarity between {resume_id} and {vec}: {sim}")
+
+            if sim >= threshold:
+                final_dict[vec] = decisiontree.ResumeModel(id=vec,
+                                                           name=resume_data[decisiontree.NAME],
+                                                           raw_data=raw_txt_data[vec],
+                                                           vector=vectors[vec],
+                                                           explainable_classification=classifications[vec])
+
+        return final_dict
 
     return vectors
 
 
-def tiebreak(resume_id: int, job_id: int) -> bool:
+def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
     """
     This is the tiebreaker function. If the |wincount - losscount| <= 1, this function
     will decide whether to push the candidate into or out of the pool depending on
@@ -327,7 +348,10 @@ def tiebreak(resume_id: int, job_id: int) -> bool:
     # 3. Reshape reasoning list depending on a) whether we're accepting or
     # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.
     if total:
-        return num_accept/total >= .5
+        if num_accept/total > .5:
+            return decisiontree.ClassificationOutput.ACCEPT
+        elif num_accept/total < .5:
+            return decisiontree.ClassificationOutput.REJECT
 
-    raise ValueError(
-        f"Resume {resume_id}'s top k candidates don't have set classifications. Considering increasing k to find classified candidates")
+    print(f"FINAL TIEBREAKER on resume {resume_id}")
+    return decisiontree.ClassificationOutput.TIE

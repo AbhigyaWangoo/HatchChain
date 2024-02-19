@@ -33,16 +33,18 @@ OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
 SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
-NAME="name"
+NAME = "name"
+
 
 class ResumeModel():
-    def __init__(self, id: int, name: str, raw_data: str=None, json_data: Dict[Any, Any]=None, vector: List[int]=None, explainable_classification: bool=None) -> None:
-        self.id=id
-        self.name=name
-        self.raw_data=raw_data
-        self.json_data=json_data
-        self.vector=vector
-        self.explainable_classification=explainable_classification
+    def __init__(self, id: int, name: str, raw_data: str = None, json_data: Dict[Any, Any] = None, vector: List[int] = None, explainable_classification: bool = None) -> None:
+        self.id = id
+        self.name = name
+        self.raw_data = raw_data
+        self.json_data = json_data
+        self.vector = vector
+        self.explainable_classification = explainable_classification
+
 
 class SavedModelFields(enum.Enum):
     HEURISTIC_LIST = "heuristics"
@@ -51,10 +53,12 @@ class SavedModelFields(enum.Enum):
     CATEGORY = "category"
     HYPERPARAMETER_LIST = "hyperparam_lst"
 
+
 class ClassificationOutput(enum.Enum):
-    ACCEPT=0
-    REJECT=0
-    TIE=0
+    ACCEPT = 0
+    REJECT = 0
+    TIE = 0
+
 
 class Category():
     def __init__(self, name: str) -> None:
@@ -106,7 +110,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         self._rf_classifiers = None
 
         if load_file != EMPTY_STRING:
-            self.load_model(load_file)
+            if not self.load_model(load_file):
+                raise NameError(
+                    f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file.")
         else:
             # print("Generating heuristic list in classifier.")
             self._heuristic_list = self._generate_heuristic_list(
@@ -144,17 +150,17 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         with open(path, mode, encoding="utf8") as fp:
             fp.write(json.dumps(data))
 
-    def load_model(self, path: str) -> Dict[Any, Any] | None:
+    def load_model(self, path: str) -> bool:
         if not os.path.exists(path):
             print(f"Path {path} does not exist. Please feed in a correct path.")
-            return None
+            return False
 
         with open(path, "r", encoding="utf8") as fp:
             data = json.load(fp)
 
             if len(data) == 0:
                 print(f"Data file {path} is empty. Try a different file.")
-                return None
+                return False
 
             self._heuristic_list = data[SavedModelFields.HEURISTIC_LIST.value]
             # TODO defaulting to false for now to only consider recruiter passed in keywords.
@@ -168,13 +174,15 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for hyperparam in list_str:
                 self._hyperparam_lst.append(HyperParameter(hyperparam))
 
-    def classify(self, resume_input: str, resume_id: int = None, job_id: int = None) -> Tuple[ClassificationOutput, str]:
+            return True
+
+    def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
             self._root, resume_input, [], [], [])
         # predictions = self._generate_classifications(input=input)
-        reasonings_str=' '.join(reasoning_list)
+        reasonings_str = ' '.join(reasoning_list)
 
-        if resume_id is not None and job_id is not None and abs(len(win_list) - len(loss_list)) <= 1:
+        if len(win_list) == len(loss_list):
             return ClassificationOutput.TIE, reasonings_str
         elif len(win_list) > len(loss_list):
             return ClassificationOutput.ACCEPT, reasonings_str
