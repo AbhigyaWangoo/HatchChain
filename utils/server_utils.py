@@ -96,7 +96,10 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
             category = job_metadata['title']
             # TODO basic classifier without keywords. Need to up accuracy.
             classifier = decisiontree.ExplainableTreeClassifier(
-                hyperparams, category, consider_keywords=False)
+                hyperparams=hyperparams,
+                job_description=job_metadata,
+                category=category,
+                consider_keywords=False)
 
             if save_new_dt:
                 classifier.save_model(classifier_path)
@@ -206,7 +209,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
 
                 if res == decisiontree.ClassificationOutput.TIE:
                     # Conditional wait
-                    accept=False # TODO remove me
+                    accept = False  # TODO remove me
                     pass
                 else:
                     accept = res == decisiontree.ClassificationOutput.ACCEPT
@@ -229,6 +232,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     except Exception as e:
         active_classifications.remove((job_id, resume_id))
         err_msg = f"Classification on resume {resume_id} failed, error: {e}"
+        print(e)
 
         return {
             "reccommendation": False,
@@ -306,7 +310,8 @@ def get_k_similar(job_id: int,
         # 5. Return list (in order of closest) with raw text
         final_dict = {}
         for vec in vectors:
-            sim=similarity_calculator.compute_similarity(this_vector, np.array(vectors[vec]))
+            sim = similarity_calculator.compute_similarity(
+                this_vector, np.array(vectors[vec]))
 
             print(f"Similarity between {resume_id} and {vec}: {sim}")
 

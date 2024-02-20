@@ -3,7 +3,7 @@ from similarity.cosine import CosineSimilarity
 from collections import OrderedDict
 from . import base
 import json
-from typing import Any, List, Tuple, Dict, Set, Union
+from typing import Any, List, Tuple, Dict
 from abc import ABC
 import pandas as pd
 import tqdm
@@ -97,12 +97,13 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     contain classifications.
     """
 
-    def __init__(self, hyperparams: List[str], category: str, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
+    def __init__(self, hyperparams: List[str], category: str, job_description: Dict[Any, Any] = None, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
         super().__init__(hyperparams)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
             self._hyperparam_lst.append(HyperParameter(param))
         self._depth = len(hyperparams)
+        self._job_description = job_description
         self._heuristic_ct = _heuristic_ct
         self._category = Category(category)
         self._include_keywords = consider_keywords
@@ -436,9 +437,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         for hyperparam in self._hyperparam_lst:
             heuristic_prompt = f"""
             To be considered capable for {self._category.name}, concerning {hyperparam.name}, generate 
-            {self._heuristic_ct} precise qualities some input should have that would make them capable of
+            {self._heuristic_ct} precise qualities some resume should have that would make them capable of
             being in this category.
             """
+
+            if self._job_description is not None:
+                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}"
 
             heuristic = self._prompt_runpod(heuristic_prompt)
             heuristics.append(heuristic)
