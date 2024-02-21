@@ -77,7 +77,7 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
     if os.path.exists(classifier_path):
         print("Found classifier in local disk")
         classifier = decisiontree.ExplainableTreeClassifier(
-            [], "", classifier_path, consider_keywords=False)
+            hyperparams=[], category="", load_file=classifier_path, job_description=job_metadata, consider_keywords=False)
         return classifier
 
     # Check job data
@@ -86,13 +86,13 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
         with open(classifier_path, "w", encoding="utf8") as fp:
             fp.write(json.dumps(classifier_metadata))
 
-    try:
-        with classifier_condition:
+    with classifier_condition:
+        try:
             active_classifiers.add(job_id)
             # Never seen classifier before, need to create new one
             hyperparams = [HyperparamEnum.SKILLS.value,
-                           HyperparamEnum.EXPERIENCE.value,
-                           HyperparamEnum.EDUCATION.value]
+                            HyperparamEnum.EXPERIENCE.value,
+                            HyperparamEnum.EDUCATION.value]
             category = job_metadata['title']
             # TODO basic classifier without keywords. Need to up accuracy.
             classifier = decisiontree.ExplainableTreeClassifier(
@@ -101,18 +101,21 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
                 category=category,
                 consider_keywords=False)
 
+            print("Classifier created")
             if save_new_dt:
                 classifier.save_model(classifier_path)
 
             active_classifiers.remove(job_id)
             classifier_condition.notify()
 
-        return classifier
-    except Exception as e:
-        if job_id in active_classifiers:
-            active_classifiers.remove(job_id)
-        # print(f"Classifier creation on job {job_id} failed, error: {e}")
-        return f"Classifier creation on job {job_id} failed, error: {e}"
+            return classifier
+        except Exception as e:
+            if job_id in active_classifiers:
+                active_classifiers.remove(job_id)
+                classifier_condition.notify()
+
+            # print(f"Classifier creation on job {job_id} failed, error: {e}")
+            return f"Classifier creation on job {job_id} failed, error: {e}"
 
 
 def set_classifier(job_id: int, classifier_metadata: str):
@@ -213,6 +216,8 @@ def create_classification_wrapper(job_id: int, resume_id: int):
                     pass
                 else:
                     accept = res == decisiontree.ClassificationOutput.ACCEPT
+            else:
+                accept = accept == decisiontree.ClassificationOutput.ACCEPT
 
             # 4. set job_resumes explanation field, if not run before
             db_update = {

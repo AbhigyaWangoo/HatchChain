@@ -56,8 +56,8 @@ class SavedModelFields(enum.Enum):
 
 class ClassificationOutput(enum.Enum):
     ACCEPT = 0
-    REJECT = 0
-    TIE = 0
+    REJECT = 1
+    TIE = 2
 
 
 class Category():
@@ -436,13 +436,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         for hyperparam in self._hyperparam_lst:
             heuristic_prompt = f"""
-            To be considered capable for {self._category.name}, concerning {hyperparam.name}, generate 
-            {self._heuristic_ct} precise qualities some resume should have that would make them capable of
-            being in this category.
+            To be considered a strong candidate for the position of {self._category.name}, list 
+            {self._heuristic_ct} precise qualities regarding the {hyperparam.name} of a resume. You must only generate
+            qualities regarding {hyperparam.name}, and nothing else. You must make also make the {self._heuristic_ct} 
+            heursitics relevant to the category.
             """
 
             if self._job_description is not None:
-                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}"
+                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on the skills and job description and reference them when generating qualities."
 
             heuristic = self._prompt_runpod(heuristic_prompt)
             heuristics.append(heuristic)
