@@ -1,3 +1,4 @@
+swig
 chardet
 openai
 scikit-learn
@@ -5,6 +6,9 @@ pandas
 spacy
 typeguard
 gensim
-pymemgpt
 tqdm
 psycopg2-binary
+python-dotenv
+boto3
+fastapi
+uvicorn

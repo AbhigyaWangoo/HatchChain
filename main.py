@@ -11,6 +11,7 @@ from utils.utils import read_from, TESTDIR, LABELS
 
 client = openai.OpenAI()
 
+
 def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     """ 
     Returns a dict of {filename: label}
@@ -67,4 +68,4 @@ if __name__ == "__main__":
     # for key in similar_dict:
     #     print(key)
     #     print(similar_dict[key])
-    res = tree.tiebreak(2186, 152)
+    res = tree.tiebreak(2186, 150)

@@ -1,7 +1,9 @@
 from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
+from similarity.cosine import CosineSimilarity
+from collections import OrderedDict
 from . import base
 import json
-from typing import Any, List, Tuple, Dict, Set, Union
+from typing import Any, List, Tuple, Dict
 from abc import ABC
 import pandas as pd
 import tqdm
@@ -16,7 +18,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
-import nltk
+
+from query_engine.src.db import postgres_client, rawtxt_client
+
+
 import enum
 import numpy as np
 
@@ -28,6 +33,17 @@ OUTPUT_CSV_DIR = "data/label_keywords/"
 DATAMODELS = "data/models/"
 SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
+NAME = "name"
+
+
+class ResumeModel():
+    def __init__(self, id: int, name: str, raw_data: str = None, json_data: Dict[Any, Any] = None, vector: List[int] = None, explainable_classification: bool = None) -> None:
+        self.id = id
+        self.name = name
+        self.raw_data = raw_data
+        self.json_data = json_data
+        self.vector = vector
+        self.explainable_classification = explainable_classification
 
 
 class SavedModelFields(enum.Enum):
@@ -36,6 +52,12 @@ class SavedModelFields(enum.Enum):
     HEURISTIC_COUNT = "heuristic_ct"
     CATEGORY = "category"
     HYPERPARAMETER_LIST = "hyperparam_lst"
+
+
+class ClassificationOutput(enum.Enum):
+    ACCEPT = 0
+    REJECT = 1
+    TIE = 2
 
 
 class Category():
@@ -75,12 +97,13 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     contain classifications.
     """
 
-    def __init__(self, hyperparams: List[str], category: str, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
+    def __init__(self, hyperparams: List[str], category: str, job_description: Dict[Any, Any] = None, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
         super().__init__(hyperparams)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
             self._hyperparam_lst.append(HyperParameter(param))
         self._depth = len(hyperparams)
+        self._job_description = job_description
         self._heuristic_ct = _heuristic_ct
         self._category = Category(category)
         self._include_keywords = consider_keywords
@@ -88,7 +111,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         self._rf_classifiers = None
 
         if load_file != EMPTY_STRING:
-            self.load_model(load_file)
+            if not self.load_model(load_file):
+                raise NameError(
+                    f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file.")
         else:
             # print("Generating heuristic list in classifier.")
             self._heuristic_list = self._generate_heuristic_list(
@@ -126,13 +151,18 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         with open(path, mode, encoding="utf8") as fp:
             fp.write(json.dumps(data))
 
-    def load_model(self, path: str) -> Dict[Any, Any] | None:
+    def load_model(self, path: str) -> bool:
         if not os.path.exists(path):
             print(f"Path {path} does not exist. Please feed in a correct path.")
-            return None
+            return False
 
         with open(path, "r", encoding="utf8") as fp:
             data = json.load(fp)
+
+            if len(data) == 0:
+                print(f"Data file {path} is empty. Try a different file.")
+                return False
+
             self._heuristic_list = data[SavedModelFields.HEURISTIC_LIST.value]
             # TODO defaulting to false for now to only consider recruiter passed in keywords.
             self._include_keywords = False
@@ -145,12 +175,20 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             for hyperparam in list_str:
                 self._hyperparam_lst.append(HyperParameter(hyperparam))
 
-    def classify(self, input: str) -> Tuple[bool, str]:
-        win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, input, [], [], [])
-        # predictions = self._generate_classifications(input=input)
+            return True
 
-        return len(win_list) > len(loss_list), ' '.join(reasoning_list)
+    def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
+        win_list, loss_list, reasoning_list = self._traverse_with_input(
+            self._root, resume_input, [], [], [])
+        # predictions = self._generate_classifications(input=input)
+        reasonings_str = ' '.join(reasoning_list)
+
+        if len(win_list) == len(loss_list):
+            return ClassificationOutput.TIE, reasonings_str
+        elif len(win_list) > len(loss_list):
+            return ClassificationOutput.ACCEPT, reasonings_str
+
+        return ClassificationOutput.REJECT, reasonings_str
 
     def fit(self, dataset: str):
         """ 
@@ -354,10 +392,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
     def _navigate(self, node: Node, input_str: str, max_retry: int = 0) -> Tuple[bool, str]:
         navigation_str = f"""
-        You have a candidate and a label. On the bases of the following information
+        You have a candidate and a label. On the bases of the following heuristcs
         here: {node.heuristic} decide whether the following candidate: {input_str} fits the category 
-        of {self._category.name}. Your output should always be modelled as follows:
-
+        of {self._category.name}. When providing a reasoning, only reference the specific heuristics provided,
+        all your lines of reasoning should be relevant to the provided heuristic.
+        
+        Your output should always be modelled as follows:
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
@@ -398,10 +438,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         for hyperparam in self._hyperparam_lst:
             heuristic_prompt = f"""
-            To be considered capable for {self._category.name}, concerning {hyperparam.name}, generate 
-            {self._heuristic_ct} precise qualities some input should have that would make them capable of
-            being in this category.
+            To be considered a strong candidate for the position of {self._category.name}, list 
+            {self._heuristic_ct} precise qualities regarding the {hyperparam.name} of a resume. You must only generate
+            qualities regarding {hyperparam.name}, and nothing else. You must make also make the {self._heuristic_ct} 
+            heursitics relevant to the category.
             """
+
+            if self._job_description is not None:
+                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on the skills and job description and reference them when generating qualities."
 
             heuristic = self._prompt_runpod(heuristic_prompt)
             heuristics.append(heuristic)
