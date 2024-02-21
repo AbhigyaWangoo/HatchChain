@@ -392,10 +392,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
     def _navigate(self, node: Node, input_str: str, max_retry: int = 0) -> Tuple[bool, str]:
         navigation_str = f"""
-        You have a candidate and a label. On the bases of the following information
+        You have a candidate and a label. On the bases of the following heuristcs
         here: {node.heuristic} decide whether the following candidate: {input_str} fits the category 
-        of {self._category.name}. Your output should always be modelled as follows:
-
+        of {self._category.name}. When providing a reasoning, only reference the specific heuristics provided,
+        all your lines of reasoning should be relevant to the provided heuristic.
+        
+        Your output should always be modelled as follows:
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
