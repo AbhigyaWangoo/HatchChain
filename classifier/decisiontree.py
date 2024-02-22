@@ -72,19 +72,17 @@ class HyperParameter():
 
 class Node(ABC):
     """
-    Very important, left means a failure to pass the heuristic for navigation.
-    Right means the success to pass the heuristic.
+    A Node class for the linked list, contains the hyperparameter 
+    name and the heursitc
     """
 
     def __init__(self) -> None:
-        self.left: Node = None
-        self.right: Node = None
+        self.next: Node = None
         self.heuristic: str = ""
         self.hyperparameter_level: HyperParameter = None
 
     def __init__(self, heuristic: str = None, level: HyperParameter = None) -> None:
-        self.left: Node = None
-        self.right: Node = None
+        self.next: Node = None
         self.heuristic: str = heuristic
         self.hyperparameter_level = level
 
@@ -120,7 +118,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 consider_keywords)
             # print("Generated!")
 
-        self._root = self._construct_tree(root=None, idx=0)
+        self._root = self._construct_linked_list(root=None, idx=0)
 
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
@@ -376,17 +374,16 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         """ Traverses the tree with the input, uses comparison function to generate wins or losses """
 
         if cur_node is not None:
-            go_right, reason = self._navigate(cur_node, input)
+            pass_heuristic, reason = self._navigate(cur_node, input)
             reasoning_lst.append(reason)
 
-            if go_right:
+            if pass_heuristic:
                 win_lst.append(cur_node.hyperparameter_level.name)
-                self._traverse_with_input(
-                    cur_node.right, input, win_lst, loss_lst, reasoning_lst)
             else:
                 loss_lst.append(cur_node.hyperparameter_level.name)
-                self._traverse_with_input(
-                    cur_node.left, input, win_lst, loss_lst, reasoning_lst)
+
+            self._traverse_with_input(
+                cur_node.next, input, win_lst, loss_lst, reasoning_lst)
 
         return win_lst, loss_lst, reasoning_lst
 
@@ -445,7 +442,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             """
 
             if self._job_description is not None:
-                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on the skills and job description and reference them when generating qualities."
+                heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on and job description's ideal qualities, and reference them when generating heuristics."
 
             heuristic = self._prompt_runpod(heuristic_prompt)
             heuristics.append(heuristic)
@@ -459,31 +456,29 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return heuristics
 
-    def _construct_tree(self, root: Node, idx: int) -> Node:
+    def _construct_linked_list(self, root: Node, idx: int) -> Node:
         hyperparam = self._hyperparam_lst[idx]
         heuristic = self._heuristic_list[idx]
 
-        if root == None:
+        if root is None:
             root = Node(heuristic=heuristic, level=hyperparam)
         else:
             root.heuristic = heuristic
             root.hyperparameter_level = hyperparam
 
         if idx < self._depth-1:
-            root.left = Node()
-            root.right = Node()
-            self._construct_tree(root=root.left, idx=idx+1)
-            self._construct_tree(root=root.right, idx=idx+1)
+            root.next = Node()
+            self._construct_linked_list(root=root.next, idx=idx+1)
 
         return root
 
-    def print_tree(self):
+    def print_list(self):
+        """ A debug function that prints out the entire list """
 
-        def __tree_print(node: Node):
+        def __list_print(node: Node):
             if node != None:
                 __print_node(node)
-                __tree_print(node.left)
-                __tree_print(node.right)
+                __list_print(node.next)
 
         def __print_node(node: Node):
             nodestr = f"""
@@ -492,4 +487,4 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             """
             print(nodestr)
 
-        __tree_print(self._root)
+        __list_print(self._root)
