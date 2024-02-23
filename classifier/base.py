@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
-from llm import gpt, runpod
+from llm.client import gpt, runpod
 
 class AbstractClassifier(ABC):
     def __init__(self, hyperparams: List[str]) -> None:
