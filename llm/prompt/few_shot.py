@@ -1,4 +1,5 @@
 from . import base as prompter
+from . import cot
 from llm.client import base as llm
 from enum import Enum
 
@@ -48,7 +49,7 @@ Here are my reasons:
 4. Familiarity with cloud computing platforms: Given the emphasis on AWS skills in the job description, Vardhan's experience deploying machine learning models on cloud infrastructure using AWS lambda functions may be advantageous for this role. His familiarity with cloud computing platforms could enable him to quickly adapt to ElectroKare's technology stack and contribute to the team's efforts to develop novel solutions to complex problems using MLOps practices.
 5. Evidence of innovation and creativity: As Vardhan has demonstrated innovation through his patents filed for inventions related to machine learning or electrolyte monitoring technology, publications in top-tier conferences or journals related to these fields, or other forms of recognition for innovative work in these areas; it shows that he has a track record of creativity that could benefit ElectroKare significantly by bringing fresh ideas into their engineering team 
 
-Following the same format above from the examples, What is the answer to this question:  
+Following the same format above from the examples, what is the answer to this question:
 """
 
 class FewShotPrompter(prompter.Prompter):
