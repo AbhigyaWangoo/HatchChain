@@ -1,13 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from llm.client import gpt, runpod
-
+from llm.prompt import few_shot
 class AbstractClassifier(ABC):
     def __init__(self, hyperparams: List[str]) -> None:
         self._hyperparams = ', '.join(map(str, hyperparams))
         self._context_length = 4097
         self._openai_client = gpt.GPTClient()
         self._runpod_client = runpod.RunPodClient()
+
+        self._prompter = few_shot.FewShotPrompter(self._runpod_client)
 
     @abstractmethod
     def classify(self, input: str) -> str:

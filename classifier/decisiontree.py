@@ -398,7 +398,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
-        res = self._prompt_runpod(navigation_str)
+        # res = self._prompt_runpod(navigation_str)
+        res = self._prompter.prompt(navigation_str)
         try:
             reasoning = res.split(":")[-1]
 
@@ -452,7 +453,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             heuristics.append(__get_keyword_heuristic())
             self._depth += 1
 
-        print(heuristics)
+        # print(heuristics)
 
         return heuristics
 
