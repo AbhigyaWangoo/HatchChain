@@ -19,6 +19,7 @@ LABELS = {
     "Systems_Administrator",
     "Network_Administrator",
 }
+CLASSIFIER_DATA_FIELD = "classifier_data"
 
 
 def detect_encoding(file_path):

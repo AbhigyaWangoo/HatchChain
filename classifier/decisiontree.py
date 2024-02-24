@@ -1,4 +1,4 @@
-from utils.utils import lbl_to_resumeset, lbl_to_resumeset_multiproc, LABELS
+from utils.utils import lbl_to_resumeset_multiproc
 from similarity.cosine import CosineSimilarity
 from collections import OrderedDict
 from . import base
@@ -19,7 +19,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from nltk.tokenize import word_tokenize
 
-from query_engine.src.db import postgres_client, rawtxt_client
+from query_engine.src.db import postgres_client
 
 
 import enum
@@ -34,14 +34,6 @@ DATAMODELS = "data/models/"
 SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
 NAME = "name"
-
-AUGMENTED_LIST_MERGING_PROMPT = """
-You are provided with the following set of reasons for a candidate either being 
-rejected or accepted for a job. These reasonings are disjoint sentances, however, and
-your job is to make sure the grammar and transitions between sentences is correct. 
-You must preserve the facts, reasoning, and dialogue of the provided reasonings. 
-Output nothing except for the final, cohesive paragraph.
-"""
 
 LIST_MERGING_PROMPT = """
 Below, you are given a set of sentences, which aren't bound together very well.
@@ -78,10 +70,10 @@ class SavedModelFields(enum.Enum):
     HYPERPARAMETER_LIST = "hyperparam_lst"
 
 
-class ClassificationOutput(enum.Enum):
-    ACCEPT = 0
-    REJECT = 1
-    TIE = 2
+class ClassificationOutput(enum.StrEnum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+    TIE = "tie"
 
 
 class Category:
@@ -160,6 +152,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         try:
             return self._prompt_runpod(prompt)
         except (ConnectionError, ValueError):
+            print("Runpod failed. Trying with gpt client.")
             return self._prompt_gpt(prompt)
 
     def save_model(self, path: str) -> Dict[Any, Any]:
@@ -218,40 +211,42 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return True
 
     def _coalesce_response(
-        self, reasoning_list: List[str], result: ClassificationOutput
-    ) -> str:
-        if result == ClassificationOutput.ACCEPT:
-            verdict = "accepted"
-        elif result == ClassificationOutput.REJECT:
-            verdict = "rejected"
+        self, win_map: Dict[HyperParameter, str], loss_map: Dict[HyperParameter, str]
+    ) -> Tuple[ClassificationOutput, str]:
+
+        verdict: ClassificationOutput
+        reasonings_str: str
+
+        if len(win_map) == len(loss_map):
+            verdict = ClassificationOutput.TIE
+        elif len(win_map) > len(loss_map):
+            verdict = ClassificationOutput.ACCEPT
         else:
-            return " ".join(reasoning_list)
+            verdict = ClassificationOutput.REJECT
 
-        reasonings_str = " ".join(reasoning_list)
-        reasonings_str = self.prompt_wrapper(
-            f"{LIST_MERGING_PROMPT}. Keep in mind, the candidate was {verdict}. {reasonings_str}"
-        )
+        print(self._job_description)
+        merging_prompt = f"""
+            You are given the following reasonings to accept a candidate for a job here:
+            {' '.join(list(win_map.values()))}
+            And the following reasongs to reject that candidate for the job here:
+            {' '.join(list(loss_map.values()))}
+            
+            The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
+            
+            Given that this candidate should be {verdict.value}ed, Generate a final
+            reasoning paragraph that has the same number of sentences as all the reasonings combined.
+            Preserve each sentence, and do not summarize or eliminate data. Specifically reiterate that 
+            the candidate should be {verdict.value}ed
+        """
 
-        print(reasonings_str)
-        return reasonings_str
+        reasonings_str = self.prompt_wrapper(merging_prompt)
+
+        return verdict, reasonings_str
 
     def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
-        win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, resume_input, [], [], []
-        )
+        win_map, loss_map = self._traverse_with_input(self._root, resume_input, {}, {})
 
-        if len(win_list) == len(loss_list):
-            return ClassificationOutput.TIE, " ".join(reasoning_list)
-        elif len(win_list) > len(loss_list):
-            reasonings_str = self._coalesce_response(
-                reasoning_list, ClassificationOutput.ACCEPT
-            )
-            return ClassificationOutput.ACCEPT, reasonings_str
-
-        reasonings_str = self._coalesce_response(
-            reasoning_list, ClassificationOutput.REJECT
-        )
-        return ClassificationOutput.REJECT, reasonings_str
+        return self._coalesce_response(win_map, loss_map)
 
     def fit(self, dataset: str):
         """
@@ -472,26 +467,22 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         self,
         cur_node: Node,
         input: str,
-        win_lst: List[str],
-        loss_lst: List[str],
-        reasoning_lst: List[str],
-    ) -> Tuple[List[str], List[str], List[str]]:
+        win_map: Dict[HyperParameter, str],
+        loss_map: Dict[HyperParameter, str],
+    ) -> Tuple[Dict[HyperParameter, str], Dict[HyperParameter, str]]:
         """Traverses the tree with the input, uses comparison function to generate wins or losses"""
 
         if cur_node is not None:
             pass_heuristic, reason = self._navigate(cur_node, input, 2)
-            reasoning_lst.append(reason)
 
             if pass_heuristic:
-                win_lst.append(cur_node.hyperparameter_level.name)
+                win_map[cur_node.hyperparameter_level] = reason
             else:
-                loss_lst.append(cur_node.hyperparameter_level.name)
+                loss_map[cur_node.hyperparameter_level] = reason
 
-            self._traverse_with_input(
-                cur_node.next, input, win_lst, loss_lst, reasoning_lst
-            )
+            self._traverse_with_input(cur_node.next, input, win_map, loss_map)
 
-        return win_lst, loss_lst, reasoning_lst
+        return win_map, loss_map
 
     def _navigate(
         self, node: Node, input_str: str, max_retry: int = 0

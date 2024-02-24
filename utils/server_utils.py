@@ -3,6 +3,7 @@ import multiprocessing
 from classifier import decisiontree
 from similarity import cosine
 import enum
+from utils.utils import CLASSIFIER_DATA_FIELD
 import json
 from typing import Dict, Any, Union
 import os
@@ -75,10 +76,10 @@ def get_classifier(
     classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
 
     # Check job data
-    if job_metadata["classifier_data"] is not None and not os.path.exists(
+    if job_metadata[CLASSIFIER_DATA_FIELD] is not None and not os.path.exists(
         classifier_path
     ):
-        classifier_metadata = job_metadata["classifier_data"]
+        classifier_metadata = job_metadata[CLASSIFIER_DATA_FIELD]
         with open(classifier_path, "w", encoding="utf8") as fp:
             fp.write(json.dumps(classifier_metadata))
 
@@ -145,7 +146,7 @@ def set_classifier(job_id: int, classifier_metadata: str):
 
     print("Created client")
 
-    client.update_job(postgres_client.CLASSIFIER_DATA_FIELD, classifier_metadata)
+    client.update_job(CLASSIFIER_DATA_FIELD, classifier_metadata)
 
     # Small note: Technically, the SERVER_ROOT_DATAPATH/<job_id>.json can potentially have
     # the job metadata, but not the classifier metadata in the classifier_data field if
