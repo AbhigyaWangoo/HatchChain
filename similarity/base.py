@@ -16,21 +16,26 @@ class Similarity(ABC):
     def compute_similarity(self, doc1: ndarray, doc2: ndarray) -> float:
         pass
 
-    def top_k(self, v1: ndarray, v_dict: Dict[int, ndarray], k: int) -> OrderedDict[int, ndarray]:
+    def top_k(
+        self, v1: ndarray, v_dict: Dict[int, ndarray], k: int
+    ) -> OrderedDict[int, ndarray]:
         # Ensure the input vector is not empty
         if len(v1) == 0:
             raise ValueError("Input vector cannot be empty")
 
         # Calculate similarities between v1 and all vectors in v_dict
-        similarities = {key: self.compute_similarity(v1, vector)
-                        for key, vector in v_dict.items()}
+        similarities = {
+            key: self.compute_similarity(v1, vector) for key, vector in v_dict.items()
+        }
 
         # Sort the dictionary by similarity in descending order
         sorted_similarities = dict(
-            sorted(similarities.items(), key=lambda item: item[1], reverse=True))
+            sorted(similarities.items(), key=lambda item: item[1], reverse=True)
+        )
 
         # Get the top k similar vectors
-        top_k_vectors = {key: v_dict[key]
-                         for key in list(sorted_similarities.keys())[:k]}
+        top_k_vectors = {
+            key: v_dict[key] for key in list(sorted_similarities.keys())[:k]
+        }
 
         return OrderedDict(top_k_vectors)

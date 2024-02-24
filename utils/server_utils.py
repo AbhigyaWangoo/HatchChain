@@ -31,7 +31,7 @@ class HyperparamEnum(enum.Enum):
 
 
 def get_job_metadata(job_id: int) -> Dict[Any, Any]:
-    """ 
+    """
     Reads all metadata for a job, and returns it. This function first checks to see
     if the local disk has a previously saved metadata file, and if not, queries the
     db.
@@ -39,23 +39,24 @@ def get_job_metadata(job_id: int) -> Dict[Any, Any]:
     job_id: job id to retrieve data from
     """
 
-    job_metadata_file = os.path.join(
-        SERVER_ROOT_DATAPATH, f"{str(job_id)}.json")
+    job_metadata_file = os.path.join(SERVER_ROOT_DATAPATH, f"{str(job_id)}.json")
     job_metadata = {}
 
     if not os.path.exists(job_metadata_file):
         client = postgres_client.PostgresClient(job_id)
         job_metadata = client.read_job(job_metadata_file)
     else:
-        with open(job_metadata_file, 'r', encoding="utf8") as file:
+        with open(job_metadata_file, "r", encoding="utf8") as file:
             job_metadata = json.load(file)
 
     return job_metadata
 
 
-def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decisiontree.ExplainableTreeClassifier]:
+def get_classifier(
+    job_id: int, save_new_dt: bool = True
+) -> Union[str, decisiontree.ExplainableTreeClassifier]:
     """
-    This function either loads a classifier from local disk, or creates a new one 
+    This function either loads a classifier from local disk, or creates a new one
     if the classifier has never been created. By default, it will save all newly made
     classifiers to local disk.
 
@@ -73,33 +74,48 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
 
     classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
 
+    # Check job data
+    if job_metadata["classifier_data"] is not None and not os.path.exists(
+        classifier_path
+    ):
+        classifier_metadata = job_metadata["classifier_data"]
+        with open(classifier_path, "w", encoding="utf8") as fp:
+            fp.write(json.dumps(classifier_metadata))
+
     # Check local datapath for classifier
     if os.path.exists(classifier_path):
         print("Found classifier in local disk")
-        classifier = decisiontree.ExplainableTreeClassifier(
-            hyperparams=[], category="", load_file=classifier_path, job_description=job_metadata, consider_keywords=False)
-        return classifier
-
-    # Check job data
-    if job_metadata['classifier_data'] is not None:
-        classifier_metadata = job_metadata['classifier_data']
-        with open(classifier_path, "w", encoding="utf8") as fp:
-            fp.write(json.dumps(classifier_metadata))
+        try:
+            classifier = decisiontree.ExplainableTreeClassifier(
+                hyperparams=[],
+                category="",
+                load_file=classifier_path,
+                job_description=job_metadata,
+                consider_keywords=False,
+            )
+            return classifier
+        except Exception as e:
+            print(
+                f"Error loading existing classifier: {e}. Overwritting existing job with new classifier."
+            )
 
     with classifier_condition:
         try:
             active_classifiers.add(job_id)
             # Never seen classifier before, need to create new one
-            hyperparams = [HyperparamEnum.SKILLS.value,
-                            HyperparamEnum.EXPERIENCE.value,
-                            HyperparamEnum.EDUCATION.value]
-            category = job_metadata['title']
+            hyperparams = [
+                HyperparamEnum.SKILLS.value,
+                HyperparamEnum.EXPERIENCE.value,
+                HyperparamEnum.EDUCATION.value,
+            ]
+            category = job_metadata["title"]
             # TODO basic classifier without keywords. Need to up accuracy.
             classifier = decisiontree.ExplainableTreeClassifier(
                 hyperparams=hyperparams,
                 job_description=job_metadata,
                 category=category,
-                consider_keywords=False)
+                consider_keywords=False,
+            )
 
             print("Classifier created")
             if save_new_dt:
@@ -119,7 +135,7 @@ def get_classifier(job_id: int, save_new_dt: bool = True) -> Union[str, decision
 
 
 def set_classifier(job_id: int, classifier_metadata: str):
-    """ 
+    """
     Sets the classifier in the pgres job table.
 
     job_id: id of job to update
@@ -129,8 +145,7 @@ def set_classifier(job_id: int, classifier_metadata: str):
 
     print("Created client")
 
-    client.update_job(postgres_client.CLASSIFIER_DATA_FIELD,
-                      classifier_metadata)
+    client.update_job(postgres_client.CLASSIFIER_DATA_FIELD, classifier_metadata)
 
     # Small note: Technically, the SERVER_ROOT_DATAPATH/<job_id>.json can potentially have
     # the job metadata, but not the classifier metadata in the classifier_data field if
@@ -149,8 +164,7 @@ def create_classifier_wrapper(job_id: int):
     if isinstance(res, str):
         print(res)
     else:
-        classifier_path = os.path.join(
-            CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
+        classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
         with open(classifier_path, "r", encoding="utf8") as fp:
             saved_model = json.loads(fp.read())
 
@@ -159,9 +173,9 @@ def create_classifier_wrapper(job_id: int):
 
 
 def create_classification_wrapper(job_id: int, resume_id: int):
-    """ 
+    """
     This function creates a classification for the resume data provided by the resume id
-    and the job id, and updates the value in the job_resumes table. It serves as a 
+    and the job id, and updates the value in the job_resumes table. It serves as a
     wrapper that the async and sync endpoints can call.
 
     job_id: id to get tree construction for.
@@ -169,14 +183,10 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     """
 
     if (job_id, resume_id) in active_classifications:
-        duplicate_msg = f'''There is already an active classification 
-                occurring on resume {resume_id} for job {job_id}'''
+        duplicate_msg = f"""There is already an active classification 
+                occurring on resume {resume_id} for job {job_id}"""
         # print(duplicate_msg)
-        return {
-            "reccommendation": False,
-            'reasoning': "",
-            'message': duplicate_msg
-        }
+        return {"reccommendation": False, "reasoning": "", "message": duplicate_msg}
     while job_id in active_classifiers:
         with classifier_condition:
             classifier_condition.wait()
@@ -192,7 +202,8 @@ def create_classification_wrapper(job_id: int, resume_id: int):
         dbcached = client.read_job_resume(
             resume_id,
             postgres_client.CLASSIFICATION_DATA_FIELD,
-            postgres_client.CLASSIFICATION_REASONING_DATA_FIELD)
+            postgres_client.CLASSIFICATION_REASONING_DATA_FIELD,
+        )
         accept, reasoning = dbcached[0], dbcached[1]
 
         if accept is None or reasoning is None:
@@ -200,7 +211,8 @@ def create_classification_wrapper(job_id: int, resume_id: int):
 
             # 3. Reading client metadata
             candidate_metadata = client.read_candidate(
-                resume_id, postgres_client.RESUME_DATA_FIELD)
+                resume_id, postgres_client.RESUME_DATA_FIELD
+            )
             strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
@@ -219,10 +231,13 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             else:
                 accept = accept == decisiontree.ClassificationOutput.ACCEPT
 
+            print(accept)
+            print(reasoning)
+
             # 4. set job_resumes explanation field, if not run before
             db_update = {
                 postgres_client.CLASSIFICATION_DATA_FIELD: accept,
-                postgres_client.CLASSIFICATION_REASONING_DATA_FIELD: reasoning
+                postgres_client.CLASSIFICATION_REASONING_DATA_FIELD: reasoning,
             }
             client.update_job_resume(resume_id, **db_update)
 
@@ -230,30 +245,24 @@ def create_classification_wrapper(job_id: int, resume_id: int):
         active_classifications.remove((job_id, resume_id))
         return {
             "reccommendation": accept,
-            'reasoning': reasoning,
-            'message': f'Successfully classified and added reasoning to job table for job id {job_id}'
+            "reasoning": reasoning,
+            "message": f"Successfully classified and added reasoning to job table for job id {job_id}",
         }
 
     except Exception as e:
         active_classifications.remove((job_id, resume_id))
         err_msg = f"Classification on resume {resume_id} failed, error: {e}"
-        print(e)
+        print(err_msg)
 
-        return {
-            "reccommendation": False,
-            'reasoning': "",
-            'message': err_msg
-        }
+        return {"reccommendation": False, "reasoning": "", "message": err_msg}
 
 
-def get_k_similar(job_id: int,
-                  resume_id: int,
-                  k: int,
-                  threshold: float = 0.55,
-                  raw: bool = True) -> OrderedDict[int, decisiontree.ResumeModel]:
-    """ 
-    This function gets the top k similar resumes from the db and 
-    returns their metadata. It will return either the full raw text, or the 
+def get_k_similar(
+    job_id: int, resume_id: int, k: int, threshold: float = 0.55, raw: bool = True
+) -> OrderedDict[int, decisiontree.ResumeModel]:
+    """
+    This function gets the top k similar resumes from the db and
+    returns their metadata. It will return either the full raw text, or the
     vectors, dependant on the 'raw' flag.
 
     job_id: int
@@ -280,7 +289,10 @@ def get_k_similar(job_id: int,
         res_id = resume[0]
 
         res = client.read_job_resume(
-            res_id, postgres_client.VECTOR_DATA_FIELD, postgres_client.CLASSIFICATION_DATA_FIELD)
+            res_id,
+            postgres_client.VECTOR_DATA_FIELD,
+            postgres_client.CLASSIFICATION_DATA_FIELD,
+        )
         vec = res[0]
         classification = res[1]
 
@@ -308,24 +320,29 @@ def get_k_similar(job_id: int,
         pgres_client = postgres_client.PostgresClient(job_id)
 
         resume_data = pgres_client.read_candidate(
-            resume_id, postgres_client.RESUME_DATA_FIELD)[0]
+            resume_id, postgres_client.RESUME_DATA_FIELD
+        )[0]
         raw_txt_data = txt_client.batch_get_resume(
-            list(vectors.keys()), "", save_to_file=False, return_txt=True)
+            list(vectors.keys()), "", save_to_file=False, return_txt=True
+        )
 
         # 5. Return list (in order of closest) with raw text
         final_dict = {}
         for vec in vectors:
             sim = similarity_calculator.compute_similarity(
-                this_vector, np.array(vectors[vec]))
+                this_vector, np.array(vectors[vec])
+            )
 
             print(f"Similarity between {resume_id} and {vec}: {sim}")
 
             if sim >= threshold:
-                final_dict[vec] = decisiontree.ResumeModel(id=vec,
-                                                           name=resume_data[decisiontree.NAME],
-                                                           raw_data=raw_txt_data[vec],
-                                                           vector=vectors[vec],
-                                                           explainable_classification=classifications[vec])
+                final_dict[vec] = decisiontree.ResumeModel(
+                    id=vec,
+                    name=resume_data[decisiontree.NAME],
+                    raw_data=raw_txt_data[vec],
+                    vector=vectors[vec],
+                    explainable_classification=classifications[vec],
+                )
 
         return final_dict
 
@@ -344,8 +361,7 @@ def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
 
     # 1. call top k function
     # 2. find top k resumes, and find majority acceptance rate
-    similar_resumes = get_k_similar(
-        job_id, resume_id, k=NUM_SIMILAR, raw=True)
+    similar_resumes = get_k_similar(job_id, resume_id, k=NUM_SIMILAR, raw=True)
 
     num_accept = 0
     total = 0
@@ -358,9 +374,9 @@ def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
     # 3. Reshape reasoning list depending on a) whether we're accepting or
     # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.
     if total:
-        if num_accept/total > .5:
+        if num_accept / total > 0.5:
             return decisiontree.ClassificationOutput.ACCEPT
-        elif num_accept/total < .5:
+        elif num_accept / total < 0.5:
             return decisiontree.ClassificationOutput.REJECT
 
     print(f"FINAL TIEBREAKER on resume {resume_id}")

@@ -9,17 +9,26 @@ from multiprocessing import Process, Lock, Manager, cpu_count
 
 NOLABEL = "nolabel"
 TESTDIR = "data/"
-LABELS = {'Database_Administrator', 'Project_manager',  'Java_Developer', 'Python_Developer',
-          'Software_Developer', 'Web_Developer', 'Systems_Administrator', 'Network_Administrator'}
+LABELS = {
+    "Database_Administrator",
+    "Project_manager",
+    "Java_Developer",
+    "Python_Developer",
+    "Software_Developer",
+    "Web_Developer",
+    "Systems_Administrator",
+    "Network_Administrator",
+}
+
 
 def detect_encoding(file_path):
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         result = chardet.detect(f.read())
-        return result['encoding']
+        return result["encoding"]
 
 
 def read_from(filename: str) -> List[str]:
-    """ Reads ALL LINES from the provided file."""
+    """Reads ALL LINES from the provided file."""
 
     try:
         encoding = detect_encoding(filename)
@@ -30,7 +39,7 @@ def read_from(filename: str) -> List[str]:
         return []
 
 
-def get_all_labels(file_path: str = 'normlized_classes.txt') -> Set:
+def get_all_labels(file_path: str = "normlized_classes.txt") -> Set:
     fin = set()
     with open(file_path, encoding=detect_encoding(file_path)) as fp:
         # Iterate through each line in the file
@@ -44,7 +53,13 @@ def get_all_labels(file_path: str = 'normlized_classes.txt') -> Set:
     return fin
 
 
-def lbl_to_resumeset(dir_path: str, label_set: Set, files: List[str] = [], disable: bool=True, n_processes: int = 1) -> Dict[str, Set[str]]:
+def lbl_to_resumeset(
+    dir_path: str,
+    label_set: Set,
+    files: List[str] = [],
+    disable: bool = True,
+    n_processes: int = 1,
+) -> Dict[str, Set[str]]:
     res = {}
     files = os.listdir(dir_path)
     files.sort()
@@ -56,9 +71,11 @@ def lbl_to_resumeset(dir_path: str, label_set: Set, files: List[str] = [], disab
             lbls = read_from(dir_path + file)
             lbls_found_set = set(lbls)
 
-            if len(label_set) == 0 or (len(label_set) > 0 and len(lbls_found_set.intersection(label_set)) > 0):
+            if len(label_set) == 0 or (
+                len(label_set) > 0 and len(lbls_found_set.intersection(label_set)) > 0
+            ):
                 data = read_from(dir_path + base + ".txt")
-                
+
                 if len(data) > 0:
                     data = data[0].strip()
                     for lbl_found in lbls:
@@ -67,10 +84,13 @@ def lbl_to_resumeset(dir_path: str, label_set: Set, files: List[str] = [], disab
                             res[lbl_found] = set()
 
                         res[lbl_found].add(data)
-    
+
     return res
 
-def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True, process_percentage: float = 0.9):
+
+def lbl_to_resumeset_multiproc(
+    dir_path: str, label_set: Set, disable: bool = True, process_percentage: float = 0.9
+):
     dir_files = os.listdir(dir_path)
     dir_files.sort()
     manager = Manager()
@@ -84,7 +104,11 @@ def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True
     def __read_chunk(lock: Lock, start_idx: int, end_idx: int, rv_acc) -> None:
         chunk = start_idx // chunk_size
 
-        for idx in tqdm.tqdm(range(start_idx, end_idx-1), disable=disable, desc=f"Processing chunk {chunk} of {n_processes}"):
+        for idx in tqdm.tqdm(
+            range(start_idx, end_idx - 1),
+            disable=disable,
+            desc=f"Processing chunk {chunk} of {n_processes}",
+        ):
             cur_file = dir_files[idx]
             base, ext = os.path.splitext(cur_file)
 
@@ -92,27 +116,33 @@ def lbl_to_resumeset_multiproc(dir_path: str, label_set: Set, disable: bool=True
                 lbls = read_from(dir_path + cur_file)
                 lbls_found_set = set(lbls)
 
-                if len(label_set) == 0 or (len(label_set) > 0 and len(lbls_found_set.intersection(label_set)) > 0):
+                if len(label_set) == 0 or (
+                    len(label_set) > 0
+                    and len(lbls_found_set.intersection(label_set)) > 0
+                ):
                     data = read_from(dir_path + base + ".txt")
-                    
+
                     if len(data) > 0:
                         data = data[0].strip()
                         for lbl_found in lbls:
-                            
+
                             lock.acquire()
                             if lbl_found not in rv_acc:
                                 rv_acc[lbl_found] = manager.list()
-                            
+
                             rv_acc[lbl_found].append(data)
 
                             lock.release()
-            idx+=1
-    
+            idx += 1
+
     for idx in range(n_processes):
-        p = Process(target=__read_chunk, args=(lock, idx * chunk_size, (idx+1)*chunk_size, res))
+        p = Process(
+            target=__read_chunk,
+            args=(lock, idx * chunk_size, (idx + 1) * chunk_size, res),
+        )
         proccesses.append(p)
         p.start()
-        
+
     for process in proccesses:
         process.join()
 

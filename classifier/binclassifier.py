@@ -4,9 +4,10 @@ from openai import OpenAI
 client = OpenAI()
 from . import base
 
+
 class ExplainableClassifier(base.AbstractClassifier):
     """
-    This is a classifier that uses LLMs to generate explanations for 
+    This is a classifier that uses LLMs to generate explanations for
     binary classifications.
     """
 
@@ -17,17 +18,17 @@ class ExplainableClassifier(base.AbstractClassifier):
     def classify(self, input: str, category: str) -> Tuple[bool, str]:
         approve_reasons = self._prompt_gpt(self._get_context(category, input))
         reject_reasons = self._prompt_gpt(self._get_context(category, input, False))
-        
+
         print(approve_reasons)
         print(reject_reasons)
-        
+
         return self._classify_from_reasons(approve_reasons, reject_reasons, category)
 
-    def _get_context(self, category: str, input_data: str, approve: bool=True) -> str:
+    def _get_context(self, category: str, input_data: str, approve: bool = True) -> str:
         approve_or_deny = "reject"
         if approve:
             approve_or_deny = "accept"
-        
+
         context = f"""You are an explainable binary classifier. Using the following parameters the recruiter cares
         about regarding a candidate: {self._hyperparams}, for each parameter, generate a precise reason to {approve_or_deny} 
         the candidate for the category of {category}. If there is no reason to {approve_or_deny} the candidate for that hyperparameter,
@@ -51,10 +52,11 @@ class ExplainableClassifier(base.AbstractClassifier):
         resume: {input}
         """
 
-        completion = client.completions.create(prompt=output_prompt,
-        engine="text-davinci-003")
+        completion = client.completions.create(
+            prompt=output_prompt, engine="text-davinci-003"
+        )
 
-        generated_response = completion['choices'][0]['text'].strip()
+        generated_response = completion["choices"][0]["text"].strip()
         decision, *reason = generated_response.split(":")
 
         if decision.lower() == "false":
@@ -64,26 +66,27 @@ class ExplainableClassifier(base.AbstractClassifier):
     def _summarize_chunk(self, chunk: str, cutoff: int = 2000) -> str:
         """Helper function to truncate a string at a specific point and recursively summarize it"""
         summarizer_prompt = f"Summarize the following into exactly {str(cutoff)} characters or less: {chunk}"
-        
-        completion = client.completions.create(prompt=summarizer_prompt,
-        engine="text-davinci-003",
-        max_tokens=cutoff)
 
-        generated_response = completion['choices'][0]['text'].strip()
+        completion = client.completions.create(
+            prompt=summarizer_prompt, engine="text-davinci-003", max_tokens=cutoff
+        )
+
+        generated_response = completion["choices"][0]["text"].strip()
 
         return generated_response
-        
 
-    def _trim_input(self, input: str, n_chunks: int = 5, reduction_multiplier: float = 0.75) -> str:
-        whitespace_removal = input.replace(r' {2,}', "").strip()
-        
+    def _trim_input(
+        self, input: str, n_chunks: int = 5, reduction_multiplier: float = 0.75
+    ) -> str:
+        whitespace_removal = input.replace(r" {2,}", "").strip()
+
         def split_string_into_chunks(s: str, n: int) -> List[str]:
             """Split a string into n equal chunks."""
             if n <= 0:
                 raise ValueError("Number of chunks (n) must be greater than 0.")
             chunk_size = len(s) // n
             remainder = len(s) % n
-            chunks = [s[i * chunk_size:(i + 1) * chunk_size] for i in range(n)]
+            chunks = [s[i * chunk_size : (i + 1) * chunk_size] for i in range(n)]
             # Add the remaining characters to the last chunk
             if remainder:
                 chunks[-1] += s[-remainder:]
@@ -92,12 +95,16 @@ class ExplainableClassifier(base.AbstractClassifier):
         chunks = split_string_into_chunks(whitespace_removal, n_chunks)
         final = ""
         for chunk in chunks:
-            final += self._summarize_chunk(chunk, int((len(whitespace_removal) // n_chunks) * reduction_multiplier))
-        
+            final += self._summarize_chunk(
+                chunk, int((len(whitespace_removal) // n_chunks) * reduction_multiplier)
+            )
+
         return final
 
-    def _classify_from_reasons(self, approve_reasons: List[str], reject_reasons: List[str], role: str) -> Tuple[bool, str]:
-        """ Provided with the reasons to approve or deny a classification, and a reasoning for said classification """
+    def _classify_from_reasons(
+        self, approve_reasons: List[str], reject_reasons: List[str], role: str
+    ) -> Tuple[bool, str]:
+        """Provided with the reasons to approve or deny a classification, and a reasoning for said classification"""
         final_classification_context = f"""
         I have provided you with the following reasons to approve or deny a candidate for the role of {role}.
         Decide whether to approve or deny this candidate, and specify why exactly that candidate should be approved or denied.
@@ -112,10 +119,11 @@ class ExplainableClassifier(base.AbstractClassifier):
         <true | false>:<paragraph formatted reasoning>
         """
 
-        completion = client.completions.create(prompt=final_classification_context,
-        engine="text-davinci-003")
+        completion = client.completions.create(
+            prompt=final_classification_context, engine="text-davinci-003"
+        )
 
-        generated_response = completion['choices'][0]['text'].strip()
+        generated_response = completion["choices"][0]["text"].strip()
         decision, *reasons = generated_response.split(":")
         print("Decision on candidate:" + decision)
         return bool(decision), " ".join(reasons)
