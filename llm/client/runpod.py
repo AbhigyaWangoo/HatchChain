@@ -1,11 +1,12 @@
 from . import base
 import time
+from enum import StrEnum
 import requests
 import json
+from json import JSONDecodeError
 import os
 from dotenv import load_dotenv
 from urllib.parse import urljoin
-from enum import Enum
 
 RUN_ENDPOINT = "run"
 RUNSYNC_ENDPOINT = "runsync"
@@ -15,9 +16,16 @@ TEXT = "text"
 STATUS = "status"
 
 
-class RunPodStatus(Enum):
+class RunPodStatus(StrEnum):
     IN_QUEUE = "IN_QUEUE"
     COMPLETED = "COMPLETED"
+    IN_PROGRESS = "IN_PROGRESS"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    TIMED_OUT = "TIMED_OUT"
+
+
+MAX_RETRIES = 100
 
 
 class RunPodClient(base.AbstractLLM):
@@ -82,18 +90,48 @@ class RunPodClient(base.AbstractLLM):
         response_json = json.loads(response.text)
 
         status = RunPodStatus(response_json[STATUS])
-        status_url = urljoin(self._model_endpoint, f"/{STATUS}/{response_json['id']}")
+        status_url = urljoin(self._model_endpoint, f"{STATUS}")
+        status_url = f"{status_url}/{response_json['id']}"
 
-        while status == RunPodStatus.IN_QUEUE:
-            time.sleep(1)
-            resp = requests.get(status_url, headers=headers, timeout=1)
-            response_json = json.loads(resp.text)
-            status = response_json[STATUS]
+        for i in range(MAX_RETRIES):
+            if status == RunPodStatus.IN_QUEUE or status == RunPodStatus.IN_PROGRESS:
+                time.sleep(2)
+                try:
+                    resp = requests.get(status_url, headers=headers, timeout=1)
+                    response_json = json.loads(resp.text)
+                    status = response_json[STATUS]
+                except JSONDecodeError:
+                    print(
+                        f"Getting {resp.status_code} on endpoint {status_url}. Retrying..."
+                    )
 
-        if full_resp:
+                if i == MAX_RETRIES - 1:
+                    status = RunPodStatus.TIMED_OUT
+
+            elif (
+                status == RunPodStatus.CANCELLED
+                or status == RunPodStatus.FAILED
+                or status == RunPodStatus.TIMED_OUT
+            ):
+                raise ConnectionError(
+                    f"Runpod client job had error {status}. Please try a different client at this time"
+                )
+
+        if status == RunPodStatus.TIMED_OUT:
+            raise ConnectionError(
+                "Runpod client job timed out. Please try a different client at this time"
+            )
+        elif full_resp:
             return response_json
 
-        if isinstance(response_json[OUTPUT][TEXT], list):
-            return response_json[OUTPUT][TEXT][0]
+        if OUTPUT in response_json and TEXT in response_json[OUTPUT]:
+            if status == RunPodStatus.COMPLETED and isinstance(
+                response_json[OUTPUT][TEXT], list
+            ):
+                return response_json[OUTPUT][TEXT][0]
 
-        return response_json[OUTPUT][TEXT]
+            return response_json[OUTPUT][TEXT]
+        else:
+            raise ValueError(
+                f"response from runpod was unexpected. response: {response_json}."
+            )

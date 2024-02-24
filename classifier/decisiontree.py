@@ -152,6 +152,16 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         self._root = self._construct_linked_list(root=None, idx=0)
 
+    def prompt_wrapper(self, prompt: str) -> str:
+        """
+        A failure wrapper around prompting. Prioritized runpod for now.
+        """
+
+        try:
+            return self._prompt_runpod(prompt)
+        except (ConnectionError, ValueError):
+            return self._prompt_gpt(prompt)
+
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
         if not os.path.exists(path):
@@ -218,7 +228,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return " ".join(reasoning_list)
 
         reasonings_str = " ".join(reasoning_list)
-        reasonings_str = self._prompt_runpod(
+        reasonings_str = self.prompt_wrapper(
             f"{LIST_MERGING_PROMPT}. Keep in mind, the candidate was {verdict}. {reasonings_str}"
         )
 
@@ -496,7 +506,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
-        res = self._prompt_runpod(navigation_str)
+        res = self.prompt_wrapper(navigation_str)
         # res_ft = self._prompter.prompt(navigation_str)
         try:
             reasoning = res.split(":")[-1]
@@ -543,7 +553,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             if self._job_description is not None:
                 heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on and job description's ideal qualities, and reference them when generating heuristics."
 
-            heuristic = self._prompt_runpod(heuristic_prompt)
+            heuristic = self.prompt_wrapper(heuristic_prompt)
             heuristics.append(heuristic)
 
         if consider_keywords:
