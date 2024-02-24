@@ -252,7 +252,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     except Exception as e:
         active_classifications.remove((job_id, resume_id))
         err_msg = f"Classification on resume {resume_id} failed, error: {e}"
-        print(e)
+        print(err_msg)
 
         return {"reccommendation": False, "reasoning": "", "message": err_msg}
 

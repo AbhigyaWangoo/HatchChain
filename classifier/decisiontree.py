@@ -207,7 +207,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             return True
 
-    def _coalesce_response(self, reasoning_list: List[str], result: ClassificationOutput) -> str:
+    def _coalesce_response(
+        self, reasoning_list: List[str], result: ClassificationOutput
+    ) -> str:
         if result == ClassificationOutput.ACCEPT:
             verdict = "accepted"
         elif result == ClassificationOutput.REJECT:
@@ -216,11 +218,13 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return " ".join(reasoning_list)
 
         reasonings_str = " ".join(reasoning_list)
-        reasonings_str = self._prompt_runpod(f"{LIST_MERGING_PROMPT}. Keep in mind, the candidate was {verdict}. {reasonings_str}")
+        reasonings_str = self._prompt_runpod(
+            f"{LIST_MERGING_PROMPT}. Keep in mind, the candidate was {verdict}. {reasonings_str}"
+        )
 
         print(reasonings_str)
         return reasonings_str
-    
+
     def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
             self._root, resume_input, [], [], []
@@ -229,10 +233,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         if len(win_list) == len(loss_list):
             return ClassificationOutput.TIE, " ".join(reasoning_list)
         elif len(win_list) > len(loss_list):
-            reasonings_str = self._coalesce_response(reasoning_list, ClassificationOutput.ACCEPT)
+            reasonings_str = self._coalesce_response(
+                reasoning_list, ClassificationOutput.ACCEPT
+            )
             return ClassificationOutput.ACCEPT, reasonings_str
 
-        reasonings_str = self._coalesce_response(reasoning_list, ClassificationOutput.REJECT)
+        reasonings_str = self._coalesce_response(
+            reasoning_list, ClassificationOutput.REJECT
+        )
         return ClassificationOutput.REJECT, reasonings_str
 
     def fit(self, dataset: str):
@@ -505,7 +513,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             if max_retry > 0:
                 print(error_str)
-                return self._navigate(node, input_str, max_retry-1)
+                return self._navigate(node, input_str, max_retry - 1)
 
             raise error_str
 
