@@ -35,11 +35,20 @@ SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
 NAME = "name"
 
+AUGMENTED_LIST_MERGING_PROMPT = """
+You are provided with the following set of reasons for a candidate either being 
+rejected or accepted for a job. These reasonings are disjoint sentances, however, and
+your job is to make sure the grammar and transitions between sentences is correct. 
+You must preserve the facts, reasoning, and dialogue of the provided reasonings. 
+Output nothing except for the final, cohesive paragraph.
+"""
+
 LIST_MERGING_PROMPT = """
-You are provided with the following set of sentences. Your job is to make sure the 
-grammar and transitions between sentences is correct, and you must preserve the facts, 
-reasoning, and dialogue of the provided sets. Output nothing except for the final, cohesive
-paragraph.
+Below, you are given a set of sentences, which aren't bound together very well.
+They need some transition phrases (furthermore, additionally, finally, etc.) to bind the 
+sentences together. Provide only grammatical improvements, and do not add any supplementary
+information. Do not even preface your changes. Just provide the corrected version of each 
+sentence.
 """
 
 
@@ -198,19 +207,32 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             return True
 
+    def _coalesce_response(self, reasoning_list: List[str], result: ClassificationOutput) -> str:
+        if result == ClassificationOutput.ACCEPT:
+            verdict = "accepted"
+        elif result == ClassificationOutput.REJECT:
+            verdict = "rejected"
+        else:
+            return " ".join(reasoning_list)
+
+        reasonings_str = " ".join(reasoning_list)
+        reasonings_str = self._prompt_runpod(f"{LIST_MERGING_PROMPT}. Keep in mind, the candidate was {verdict}. {reasonings_str}")
+
+        print(reasonings_str)
+        return reasonings_str
+    
     def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
             self._root, resume_input, [], [], []
         )
 
-        reasonings_str = " ".join(reasoning_list)
-        reasonings_str = self._prompt_runpod(f"{LIST_MERGING_PROMPT}: {reasonings_str}")
-
         if len(win_list) == len(loss_list):
-            return ClassificationOutput.TIE, reasonings_str
+            return ClassificationOutput.TIE, " ".join(reasoning_list)
         elif len(win_list) > len(loss_list):
+            reasonings_str = self._coalesce_response(reasoning_list, ClassificationOutput.ACCEPT)
             return ClassificationOutput.ACCEPT, reasonings_str
 
+        reasonings_str = self._coalesce_response(reasoning_list, ClassificationOutput.REJECT)
         return ClassificationOutput.REJECT, reasonings_str
 
     def fit(self, dataset: str):
@@ -439,7 +461,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         """Traverses the tree with the input, uses comparison function to generate wins or losses"""
 
         if cur_node is not None:
-            pass_heuristic, reason = self._navigate(cur_node, input)
+            pass_heuristic, reason = self._navigate(cur_node, input, 2)
             reasoning_lst.append(reason)
 
             if pass_heuristic:
@@ -483,7 +505,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             if max_retry > 0:
                 print(error_str)
-                return self._navigate(node, input_str)
+                return self._navigate(node, input_str, max_retry-1)
 
             raise error_str
 
