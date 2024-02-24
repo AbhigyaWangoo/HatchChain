@@ -13,7 +13,7 @@ client = openai.OpenAI()
 
 
 def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
-    """ 
+    """
     Returns a dict of {filename: label}
     """
 
@@ -29,18 +29,22 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
         base, ext = os.path.splitext(file)
 
         if ext == ".lab":
-            lbls = read_from(dir_path+file)
-            data = read_from(dir_path+base+".txt")[0].strip()
+            lbls = read_from(dir_path + file)
+            data = read_from(dir_path + base + ".txt")[0].strip()
 
             for lbl_line in LABELS:
                 try:
                     classifier = ExplainableTreeClassifier(
-                        ["Experiences", "Skills"], lbl_line)
+                        ["Experiences", "Skills"], lbl_line
+                    )
                     decision, reason = classifier.classify(data)
 
                     print(
-                        f"FOR CANDIDATE {file}, we {decision} for the position of {lbl_line} because {reason}")
-                    if (lbl_line in lbls and decision) or (lbl_line not in lbls and not decision):
+                        f"FOR CANDIDATE {file}, we {decision} for the position of {lbl_line} because {reason}"
+                    )
+                    if (lbl_line in lbls and decision) or (
+                        lbl_line not in lbls and not decision
+                    ):
                         s += 1.0
                     total += 1.0
 
@@ -59,11 +63,13 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
     print(f"FINAL accuracy= {s/total}\r")
     return file_to_lbl
 
+
 if __name__ == "__main__":
     # runpod_client = runpod.RunPodClient()
     # print(runpod_client.query("Hello, how are you?", False))
-    tree = ExplainableTreeClassifier(["Experiences", "skills"],
-                                     "Database_Administrator", "local.json")
+    tree = ExplainableTreeClassifier(
+        ["Experiences", "skills"], "Database_Administrator", "local.json"
+    )
     # similar_dict = tree.get_k_similar(152, 2186, 3, True)
     # for key in similar_dict:
     #     print(key)

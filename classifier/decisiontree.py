@@ -35,9 +35,24 @@ SAVED_DTMODEL = "SavedDTModel"
 SAVED_DOC2VEC = "data/models/Doc2Vec"
 NAME = "name"
 
+LIST_MERGING_PROMPT = """
+You are provided with the following set of sentences. Your job is to make sure the 
+grammar and transitions between sentences is correct, and you must preserve the facts, 
+reasoning, and dialogue of the provided sets. Output nothing except for the final, cohesive
+paragraph.
+"""
 
-class ResumeModel():
-    def __init__(self, id: int, name: str, raw_data: str = None, json_data: Dict[Any, Any] = None, vector: List[int] = None, explainable_classification: bool = None) -> None:
+
+class ResumeModel:
+    def __init__(
+        self,
+        id: int,
+        name: str,
+        raw_data: str = None,
+        json_data: Dict[Any, Any] = None,
+        vector: List[int] = None,
+        explainable_classification: bool = None,
+    ) -> None:
         self.id = id
         self.name = name
         self.raw_data = raw_data
@@ -60,19 +75,19 @@ class ClassificationOutput(enum.Enum):
     TIE = 2
 
 
-class Category():
+class Category:
     def __init__(self, name: str) -> None:
         self.name = name
 
 
-class HyperParameter():
+class HyperParameter:
     def __init__(self, name: str) -> None:
         self.name = name
 
 
 class Node(ABC):
     """
-    A Node class for the linked list, contains the hyperparameter 
+    A Node class for the linked list, contains the hyperparameter
     name and the heursitc
     """
 
@@ -88,14 +103,22 @@ class Node(ABC):
 
 
 class ExplainableTreeClassifier(base.AbstractClassifier):
-    """ 
-    A classifier loosely based on the Decision tree classifier. Meant to be 
-    more explainable in nature that a traditional decision tree. We construct the 
+    """
+    A classifier loosely based on the Decision tree classifier. Meant to be
+    more explainable in nature that a traditional decision tree. We construct the
     tree via training data, and enable a heuristic to seperate following nodes. Leaf nodes
     contain classifications.
     """
 
-    def __init__(self, hyperparams: List[str], category: str, job_description: Dict[Any, Any] = None, load_file: str = EMPTY_STRING, _heuristic_ct: int = 5, consider_keywords: bool = True) -> None:
+    def __init__(
+        self,
+        hyperparams: List[str],
+        category: str,
+        job_description: Dict[Any, Any] = None,
+        load_file: str = EMPTY_STRING,
+        _heuristic_ct: int = 5,
+        consider_keywords: bool = True,
+    ) -> None:
         super().__init__(hyperparams)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
@@ -111,11 +134,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         if load_file != EMPTY_STRING:
             if not self.load_model(load_file):
                 raise NameError(
-                    f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file.")
+                    f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file."
+                )
         else:
             # print("Generating heuristic list in classifier.")
-            self._heuristic_list = self._generate_heuristic_list(
-                consider_keywords)
+            self._heuristic_list = self._generate_heuristic_list(consider_keywords)
             # print("Generated!")
 
         self._root = self._construct_linked_list(root=None, idx=0)
@@ -177,9 +200,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
     def classify(self, resume_input: str) -> Tuple[ClassificationOutput, str]:
         win_list, loss_list, reasoning_list = self._traverse_with_input(
-            self._root, resume_input, [], [], [])
-        # predictions = self._generate_classifications(input=input)
-        reasonings_str = ' '.join(reasoning_list)
+            self._root, resume_input, [], [], []
+        )
+
+        reasonings_str = " ".join(reasoning_list)
+        reasonings_str = self._prompt_runpod(f"{LIST_MERGING_PROMPT}: {reasonings_str}")
 
         if len(win_list) == len(loss_list):
             return ClassificationOutput.TIE, reasonings_str
@@ -189,9 +214,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         return ClassificationOutput.REJECT, reasonings_str
 
     def fit(self, dataset: str):
-        """ 
-        Given a dataset, fits a decision tree classifier and uses the decision path as 
-        context when choosing the final classification decision. 
+        """
+        Given a dataset, fits a decision tree classifier and uses the decision path as
+        context when choosing the final classification decision.
         """
 
         if not os.path.isfile(SAVED_DOC2VEC):
@@ -200,43 +225,52 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         manager = multiprocessing.Manager()
 
         def __perform_grid_search(rfs: Dict[str, RandomForestClassifier], X, y):
-            grid_space = {'max_depth': [3, 5, 10, 15],
-                          'n_estimators': [10, 100, 200, 400, 500, 600],
-                          'max_features': [2, 3, 4, 5, 6, 7],
-                          'min_samples_leaf': [2, 3, 4, 5, 6],
-                          'min_samples_split': [2, 3, 4, 5, 6]
-                          }
+            grid_space = {
+                "max_depth": [3, 5, 10, 15],
+                "n_estimators": [10, 100, 200, 400, 500, 600],
+                "max_features": [2, 3, 4, 5, 6, 7],
+                "min_samples_leaf": [2, 3, 4, 5, 6],
+                "min_samples_split": [2, 3, 4, 5, 6],
+            }
 
             def __single_grid_search(rf: RandomForestClassifier, category):
                 print(f"Performing grid search on {category} classifier")
-                grid = GridSearchCV(rf, param_grid=grid_space,
-                                    cv=3, scoring='accuracy', n_jobs=2)
+                grid = GridSearchCV(
+                    rf, param_grid=grid_space, cv=3, scoring="accuracy", n_jobs=2
+                )
                 model_grid = grid.fit(X, y)
 
                 with open(f"{category}-gsrch") as fp:
                     print(
-                        f'Best hyperparameters for {category} are: {str(model_grid.best_params_)}')
+                        f"Best hyperparameters for {category} are: {str(model_grid.best_params_)}"
+                    )
                     fp.write(
-                        f'Best hyperparameters for {category} are: {str(model_grid.best_params_)}\n')
+                        f"Best hyperparameters for {category} are: {str(model_grid.best_params_)}\n"
+                    )
                     print(
-                        f'Best score for {category} is: {str(model_grid.best_score_)}')
+                        f"Best score for {category} is: {str(model_grid.best_score_)}"
+                    )
                     fp.write(
-                        f'Best score for {category} is: {str(model_grid.best_score_)}\n')
+                        f"Best score for {category} is: {str(model_grid.best_score_)}\n"
+                    )
 
             proccesses = []
             for label in rfs:
                 classifier = rfs[label]
                 print(f"running grid search on label {label}")
                 p = multiprocessing.Process(
-                    target=__single_grid_search, args=(classifier, label))
+                    target=__single_grid_search, args=(classifier, label)
+                )
                 proccesses.append(p)
                 p.start()
 
             for proc in proccesses:
                 proc.join()
 
-        def __build_internal_classifier(vector_size: int = 50, epochs: int = 1, disable: bool = False) -> Tuple[Dict[str, RandomForestClassifier], Doc2Vec]:
-            """ 
+        def __build_internal_classifier(
+            vector_size: int = 50, epochs: int = 1, disable: bool = False
+        ) -> Tuple[Dict[str, RandomForestClassifier], Doc2Vec]:
+            """
             This function builds a Doc2Vec model from the dataset, and uses it to build multiple decision tree classifiers,
             one for each category. If either models already exist in the proper directory, they will be loaded from disk.
             """
@@ -249,24 +283,29 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                     splitted_file = mfile.split("-")
 
                     if len(splitted_file) > 1 and splitted_file[0] == SAVED_DTMODEL:
-                        category_classifiers[splitted_file[-1]
-                                             ] = pickle.load(open(F"{DATAMODELS}{mfile}", "rb"))
+                        category_classifiers[splitted_file[-1]] = pickle.load(
+                            open(f"{DATAMODELS}{mfile}", "rb")
+                        )
 
                 return category_classifiers, pickle.load(open(SAVED_DOC2VEC, "rb"))
 
             def __tag_documents(category: str, documents, tagged_data):
-                for doc in tqdm.tqdm(documents, desc=f"Tagging corpus documents for {category}", disable=disable):
+                for doc in tqdm.tqdm(
+                    documents,
+                    desc=f"Tagging corpus documents for {category}",
+                    disable=disable,
+                ):
                     tokenized_doc = word_tokenize(doc.lower())
                     tags = [category]
-                    tagged_data.append(TaggedDocument(
-                        words=tokenized_doc, tags=tags))
+                    tagged_data.append(TaggedDocument(words=tokenized_doc, tags=tags))
 
             # Combine all labels for each document
             tagged_data = manager.list()
             proccesses = []
             for category, documents in corpus.items():
                 p = multiprocessing.Process(
-                    target=__tag_documents, args=(category, documents, tagged_data))
+                    target=__tag_documents, args=(category, documents, tagged_data)
+                )
                 proccesses.append(p)
                 p.start()
 
@@ -275,30 +314,39 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             #  Split the data into training and testing sets
             X_train, X_test = train_test_split(
-                tagged_data, test_size=0.2, random_state=42)
+                tagged_data, test_size=0.2, random_state=42
+            )
 
             # Train a Doc2Vec model
-            model = Doc2Vec(vector_size=vector_size,
-                            window=2, min_count=1, workers=4)
+            model = Doc2Vec(vector_size=vector_size, window=2, min_count=1, workers=4)
             print("Training Doc2Vec model with corpus")
             model.build_vocab(tagged_data)
             print("Built vocab")
 
             shuffle(tagged_data)
-            model.train(list(tagged_data),
-                        total_examples=model.corpus_count, epochs=epochs)
+            model.train(
+                list(tagged_data), total_examples=model.corpus_count, epochs=epochs
+            )
 
             print("Trained Doc2Vec Model")
 
             # Transform the training data using the trained Doc2Vec model
-            X_train_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(
-                X_train, desc="Inferring vectors from dataset", disable=disable)])
+            X_train_vectors = np.array(
+                [
+                    model.infer_vector(doc.words)
+                    for doc in tqdm.tqdm(
+                        X_train, desc="Inferring vectors from dataset", disable=disable
+                    )
+                ]
+            )
             print("transformed training data")
 
             # Train a separate binary classifier for each category
             category_classifiers = {}
             keys = corpus.keys()
-            for category in tqdm.tqdm(keys, desc=f"Training {len(keys)} decision trees", disable=disable):
+            for category in tqdm.tqdm(
+                keys, desc=f"Training {len(keys)} decision trees", disable=disable
+            ):
                 # Extract binary labels for the current category
                 y_train = [1 if category in doc.tags else 0 for doc in X_train]
 
@@ -310,12 +358,22 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 category_classifiers[category] = rf_classifier
 
             # Transform the testing data using the trained Doc2Vec model
-            X_test_vectors = np.array([model.infer_vector(doc.words) for doc in tqdm.tqdm(
-                X_test, desc="Inferring vectors for test set", disable=disable)])
+            X_test_vectors = np.array(
+                [
+                    model.infer_vector(doc.words)
+                    for doc in tqdm.tqdm(
+                        X_test, desc="Inferring vectors for test set", disable=disable
+                    )
+                ]
+            )
 
             # Make predictions for each category
             predictions = {}
-            for category, classifier in tqdm.tqdm(category_classifiers.items(), desc="Classifying test set", disable=disable):
+            for category, classifier in tqdm.tqdm(
+                category_classifiers.items(),
+                desc="Classifying test set",
+                disable=disable,
+            ):
                 predictions[category] = classifier.predict(X_test_vectors)
 
             # Evaluate the performance for each category
@@ -323,8 +381,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 y_true = [1 if category in doc.tags else 0 for doc in X_test]
                 y_pred = predictions[category]
                 accuracy = accuracy_score(y_true, y_pred)
-                report = classification_report(y_true, y_pred, target_names=[
-                                               'Not ' + category, category])
+                report = classification_report(
+                    y_true, y_pred, target_names=["Not " + category, category]
+                )
 
                 try:
                     with open("rf_classifier_report.txt", "a") as fp:
@@ -337,17 +396,16 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                         print(f"Classification Report:\n {report}")
                         fp.write(f"Classification Report:\n {report}\n")
                 except Exception as e:
-                    print(
-                        f"Error saving dt classifier report data to file: {e}")
+                    print(f"Error saving dt classifier report data to file: {e}")
 
             for category, classifier in category_classifiers.items():
-                pickle.dump(rf_classifier, open(
-                    f"{DATAMODELS}{SAVED_DTMODEL}-{category}", 'wb'))
-            pickle.dump(model, open(SAVED_DOC2VEC, 'wb'))
+                pickle.dump(
+                    rf_classifier, open(f"{DATAMODELS}{SAVED_DTMODEL}-{category}", "wb")
+                )
+            pickle.dump(model, open(SAVED_DOC2VEC, "wb"))
 
             print("performing grid search")
-            __perform_grid_search(category_classifiers,
-                                  X_train_vectors, y_train)
+            __perform_grid_search(category_classifiers, X_train_vectors, y_train)
             print("performed grid search")
 
             return category_classifiers, model
@@ -370,8 +428,15 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return predictions
 
-    def _traverse_with_input(self, cur_node: Node, input: str, win_lst: List[str], loss_lst: List[str], reasoning_lst: List[str]) -> Tuple[List[str], List[str], List[str]]:
-        """ Traverses the tree with the input, uses comparison function to generate wins or losses """
+    def _traverse_with_input(
+        self,
+        cur_node: Node,
+        input: str,
+        win_lst: List[str],
+        loss_lst: List[str],
+        reasoning_lst: List[str],
+    ) -> Tuple[List[str], List[str], List[str]]:
+        """Traverses the tree with the input, uses comparison function to generate wins or losses"""
 
         if cur_node is not None:
             pass_heuristic, reason = self._navigate(cur_node, input)
@@ -383,11 +448,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 loss_lst.append(cur_node.hyperparameter_level.name)
 
             self._traverse_with_input(
-                cur_node.next, input, win_lst, loss_lst, reasoning_lst)
+                cur_node.next, input, win_lst, loss_lst, reasoning_lst
+            )
 
         return win_lst, loss_lst, reasoning_lst
 
-    def _navigate(self, node: Node, input_str: str, max_retry: int = 0) -> Tuple[bool, str]:
+    def _navigate(
+        self, node: Node, input_str: str, max_retry: int = 0
+    ) -> Tuple[bool, str]:
         navigation_str = f"""
         You have a candidate and a label. On the bases of the following heuristcs
         here: {node.heuristic} decide whether the following candidate: {input_str} fits the category 
@@ -398,8 +466,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
-        # res = self._prompt_runpod(navigation_str)
-        res = self._prompter.prompt(navigation_str)
+        res = self._prompt_runpod(navigation_str)
+        # res_ft = self._prompter.prompt(navigation_str)
         try:
             reasoning = res.split(":")[-1]
 
@@ -428,7 +496,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
             trimmed_df = df.head(term_count)
             term_list = trimmed_df.iloc[:, 0].tolist()
-            strterms = ','.join(term_list)
+            strterms = ",".join(term_list)
 
             final_heuristic = f"candidates have the following keywords on their resume for {self._category.name}: {strterms}"
 
@@ -467,14 +535,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             root.heuristic = heuristic
             root.hyperparameter_level = hyperparam
 
-        if idx < self._depth-1:
+        if idx < self._depth - 1:
             root.next = Node()
-            self._construct_linked_list(root=root.next, idx=idx+1)
+            self._construct_linked_list(root=root.next, idx=idx + 1)
 
         return root
 
     def print_list(self):
-        """ A debug function that prints out the entire list """
+        """A debug function that prints out the entire list"""
 
         def __list_print(node: Node):
             if node != None:

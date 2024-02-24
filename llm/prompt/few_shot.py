@@ -3,7 +3,7 @@ from . import cot
 from llm.client import base as llm
 from enum import Enum
 
-NAVIGATION="""
+NAVIGATION = """
 Example 1:
 Question: You have a candidate and a label. On the bases of the following heuristcs here: 
 1. Strong programming skills in languages such as Python, PyTorch, and AWS/GCP are crucial for a machine learning engineer position at ElectroKare. A candidate with a strong background in programming will be able to develop and implement complex algorithms and models quickly and efficiently.
@@ -52,6 +52,7 @@ Here are my reasons:
 Following the same format above from the examples, what is the answer to this question:
 """
 
+
 class FewShotPrompter(prompter.Prompter):
     """
     A class for few shot prompting.
@@ -61,8 +62,8 @@ class FewShotPrompter(prompter.Prompter):
         self._client = client
 
     def prompt(self, prompt: str) -> str:
-        """ 
-        The abstract method for a prompter to execute a prompt 
+        """
+        The abstract method for a prompter to execute a prompt
         """
         final_prompt = f"{NAVIGATION}{prompt}"
 

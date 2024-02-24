@@ -2,9 +2,9 @@ from . import base as prompter
 from llm.client import base as llm
 from enum import Enum
 
-ZERO_SHOT_PROMPT="Let's think step by step"
+ZERO_SHOT_PROMPT = "Let's think step by step"
 
-FEW_SHOT_PROMPT="""
+FEW_SHOT_PROMPT = """
 Example 1:
 Question: You have a candidate and a label. On the bases of the following heuristcs here: 
 1. Strong programming skills in languages such as Python, PyTorch, and AWS/GCP are crucial for a machine learning engineer position at ElectroKare. A candidate with a strong background in programming will be able to develop and implement complex algorithms and models quickly and efficiently.
@@ -31,27 +31,32 @@ qualifications. Based on that, I would reject him for the folr of machine learni
 
 """
 
+
 class CotType(Enum):
-    """ Enum for type of COT """
-    ZERO_SHOT=0
-    FEW_SHOT_COT=1
+    """Enum for type of COT"""
+
+    ZERO_SHOT = 0
+    FEW_SHOT_COT = 1
+
 
 class ChainOfThoughtPrompter(prompter.Prompter):
     """
-    A class for chain of thought prompting. Based off paper 
+    A class for chain of thought prompting. Based off paper
     """
 
-    def __init__(self, client: llm.AbstractLLM, type: CotType=CotType.ZERO_SHOT) -> None:
+    def __init__(
+        self, client: llm.AbstractLLM, type: CotType = CotType.ZERO_SHOT
+    ) -> None:
         self._client = client
         self._type = type
 
     def __set_cot_examples(self, prompt: str):
-        """ TODO A helper function to set the cot examples """
+        """TODO A helper function to set the cot examples"""
         return prompt
 
     def prompt(self, prompt: str) -> str:
-        """ 
-        The abstract method for a prompter to execute a prompt 
+        """
+        The abstract method for a prompter to execute a prompt
         """
         formatted_prompt = "Q: " + prompt + "\n" + "A:"
 

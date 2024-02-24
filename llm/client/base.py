@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class AbstractLLM(ABC):
     def __init__(self) -> None:
         super().__init__()
