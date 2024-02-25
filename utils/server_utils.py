@@ -232,9 +232,6 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             else:
                 accept = accept == decisiontree.ClassificationOutput.ACCEPT
 
-            print(accept)
-            print(reasoning)
-
             # 4. set job_resumes explanation field, if not run before
             db_update = {
                 postgres_client.CLASSIFICATION_DATA_FIELD: accept,

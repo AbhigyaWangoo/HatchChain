@@ -224,7 +224,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
-        print(self._job_description)
         merging_prompt = f"""
             You are given the following reasonings to accept a candidate for a job here:
             {' '.join(list(win_map.values()))}
@@ -497,8 +496,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
-        res = self.prompt_wrapper(navigation_str)
-        # res_ft = self._prompter.prompt(navigation_str)
+        try:
+            res = self._prompter.prompt(navigation_str)
+        except Exception as e:  # Handling runpod failure case
+            res = self.prompt_wrapper(navigation_str)
+
         try:
             reasoning = res.split(":")[-1]
 
