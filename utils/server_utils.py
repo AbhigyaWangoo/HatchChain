@@ -347,6 +347,24 @@ def get_k_similar(
     return vectors
 
 
+def classify_all(job_id: int):
+    """
+    This function will trigger a classification on all resumes bounded to the
+    provided job. It first will retrieve or create the classifier, then asynchronusly trigger all
+    other classifications.
+
+    job_id: id of the job that we want to classify all of its resumes for
+    """
+
+    # 1. Get all resumes for a job
+    pgres_client = postgres_client.PostgresClient(job_id)
+    resume_ids = pgres_client.read_candidates_from_job("", False, True)
+
+    # 2. for each resume, call classification_wrapper
+    for resume_id in resume_ids:
+        create_classification_wrapper(job_id, resume_id=resume_id)
+
+
 def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
     """
     This is the tiebreaker function. If the |wincount - losscount| <= 1, this function

@@ -72,6 +72,20 @@ def create_classification(
     }
 
 
+@app.get("/create-all-classifications")
+def create_all_classifications(job_id: int, background_tasks: BackgroundTasks):
+    """
+    This endpoint will trigger a classification on all resumes bounded to the
+    provided job. It first will retrieve or create the classifier, then asynchronusly trigger all
+    other classifications.
+
+    job_id: id of the job that we want to classify all of its resumes for
+    """
+
+    background_tasks.add_task(server_utils.classify_all, job_id)
+    return {"message": f"Started background task for classification on job id {job_id}"}
+
+
 if __name__ == "__main__":
     if EXPLAINABLE_CLASSIFIER_ENDPOINT is None:
         print(
