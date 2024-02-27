@@ -6,6 +6,7 @@ import chardet
 import tqdm
 from typeguard import typechecked
 from multiprocessing import Process, Lock, Manager, cpu_count
+import random
 
 NOLABEL = "nolabel"
 TESTDIR = "data/"
@@ -148,3 +149,8 @@ def lbl_to_resumeset_multiproc(
         process.join()
 
     return res
+
+def generate_random_integer(n: int):
+    """ Generates a random int from 1 to n inclusive """
+    random_number = random.randint(1, n)
+    return random_number
