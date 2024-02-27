@@ -483,12 +483,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return win_map, loss_map
 
-    def _navigate(
-        self, node: Node, input_str: str, max_retry: int = 0
-    ) -> Tuple[bool, str]:
-        navigation_str = f"""
+    def get_navigation_string(self, heuristic: str, input_str: str) -> str:
+        """ Returns a crafted heuristic prompt based on the provided args """
+        
+        return f"""
         You have a candidate and a label. On the bases of the following heuristcs
-        here: {node.heuristic} decide whether the following candidate: {input_str} fits the category 
+        here: {heuristic} decide whether the following candidate: {input_str} fits the category 
         of {self._category.name}. When providing a reasoning, only reference the specific heuristics provided,
         all your lines of reasoning should be relevant to the provided heuristic.
         
@@ -496,9 +496,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         reject | accept:<reasoning for why the candidate should be accepted or rejected>
         """
 
+    def _navigate(
+        self, node: Node, input_str: str, max_retry: int = 0
+    ) -> Tuple[bool, str]:
+        navigation_str = self.get_navigation_string(node.heuristic, input_str)
+
         try:
             res = self._prompter.prompt(navigation_str)
-        except Exception as e:  # Handling runpod failure case
+        except Exception:  # Handling runpod failure case
             res = self.prompt_wrapper(navigation_str)
 
         try:

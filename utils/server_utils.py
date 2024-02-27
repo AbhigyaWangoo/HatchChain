@@ -358,7 +358,7 @@ def classify_all(job_id: int):
 
     # 1. Get all resumes for a job
     pgres_client = postgres_client.PostgresClient(job_id)
-    resume_ids = pgres_client.read_candidates_from_job("", False, True)
+    resume_ids = pgres_client.read_candidates_from_job("", save_to_file=False)
 
     # 2. for each resume, call classification_wrapper
     for resume_id in resume_ids:
