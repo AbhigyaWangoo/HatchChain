@@ -1,17 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from llm.client import gpt, runpod
-from llm.prompt import few_shot, cot
+from llm.prompt import few_shot, cot, dspy
 
+PROMPT_CRAFTER = "prompt_crafter"
+DATASET="data/dspy/dataset_10.json"
 
 class AbstractClassifier(ABC):
-    def __init__(self, hyperparams: List[str]) -> None:
+    def __init__(self, hyperparams: List[str], **kwargs) -> None:
         self._hyperparams = ", ".join(map(str, hyperparams))
         self._context_length = 4097
         self._openai_client = gpt.GPTClient()
         self._runpod_client = runpod.RunPodClient()
 
-        self._prompter = cot.ChainOfThoughtPrompter(self._runpod_client)
+        if PROMPT_CRAFTER in kwargs:
+            self._prompter = dspy.DSPyPrompter(
+                self._runpod_client, "dataset_10.json", kwargs[PROMPT_CRAFTER]
+            )
+        else:
+            self._prompter = cot.ChainOfThoughtPrompter(self._runpod_client)
 
     @abstractmethod
     def classify(self, input: str) -> str:

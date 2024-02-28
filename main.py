@@ -1,12 +1,13 @@
-from query_engine.src.db import postgres_client
+# from dspy.teleprompt import BootstrapFewShotWithRandomSearch
+# from dspy.evaluate import Evaluate
+# import dspy
+# from dspy.datasets.gsm8k import GSM8K, gsm8k_metric
 from classifier.decisiontree import ExplainableTreeClassifier
 import openai
 import os
 import pickle
 from typing import Dict, Set, List
 
-from llm import runpod
-from nltk.tokenize import word_tokenize
 from utils.utils import read_from, TESTDIR, LABELS
 
 client = openai.OpenAI()
@@ -65,13 +66,4 @@ def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    # runpod_client = runpod.RunPodClient()
-    # print(runpod_client.query("Hello, how are you?", False))
-    tree = ExplainableTreeClassifier(
-        ["Experiences", "skills"], "Database_Administrator", "local.json"
-    )
-    # similar_dict = tree.get_k_similar(152, 2186, 3, True)
-    # for key in similar_dict:
-    #     print(key)
-    #     print(similar_dict[key])
-    res = tree.tiebreak(2186, 150)
+    print("Hello world!")

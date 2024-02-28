@@ -12,3 +12,5 @@ python-dotenv
 boto3
 fastapi
 uvicorn
+black
+nltk

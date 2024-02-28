@@ -1,8 +1,10 @@
 from query_engine.src.db import postgres_client, rawtxt_client
 import multiprocessing
+from llm.client.base import get_navigation_string
 from classifier import decisiontree
 from similarity import cosine
 import enum
+from utils.utils import CLASSIFIER_DATA_FIELD
 import json
 from typing import Dict, Any, Union
 import os
@@ -75,10 +77,10 @@ def get_classifier(
     classifier_path = os.path.join(CLASSIFIERS_ROOT_DATAPATH, f"{job_id}.json")
 
     # Check job data
-    if job_metadata["classifier_data"] is not None and not os.path.exists(
+    if job_metadata[CLASSIFIER_DATA_FIELD] is not None and not os.path.exists(
         classifier_path
     ):
-        classifier_metadata = job_metadata["classifier_data"]
+        classifier_metadata = job_metadata[CLASSIFIER_DATA_FIELD]
         with open(classifier_path, "w", encoding="utf8") as fp:
             fp.write(json.dumps(classifier_metadata))
 
@@ -115,6 +117,7 @@ def get_classifier(
                 job_description=job_metadata,
                 category=category,
                 consider_keywords=False,
+                **{"prompt_crafter": get_navigation_string},
             )
 
             print("Classifier created")
@@ -145,7 +148,7 @@ def set_classifier(job_id: int, classifier_metadata: str):
 
     print("Created client")
 
-    client.update_job(postgres_client.CLASSIFIER_DATA_FIELD, classifier_metadata)
+    client.update_job(CLASSIFIER_DATA_FIELD, classifier_metadata)
 
     # Small note: Technically, the SERVER_ROOT_DATAPATH/<job_id>.json can potentially have
     # the job metadata, but not the classifier metadata in the classifier_data field if
@@ -230,9 +233,6 @@ def create_classification_wrapper(job_id: int, resume_id: int):
                     accept = res == decisiontree.ClassificationOutput.ACCEPT
             else:
                 accept = accept == decisiontree.ClassificationOutput.ACCEPT
-
-            print(accept)
-            print(reasoning)
 
             # 4. set job_resumes explanation field, if not run before
             db_update = {
@@ -347,6 +347,24 @@ def get_k_similar(
         return final_dict
 
     return vectors
+
+
+def classify_all(job_id: int):
+    """
+    This function will trigger a classification on all resumes bounded to the
+    provided job. It first will retrieve or create the classifier, then asynchronusly trigger all
+    other classifications.
+
+    job_id: id of the job that we want to classify all of its resumes for
+    """
+
+    # 1. Get all resumes for a job
+    pgres_client = postgres_client.PostgresClient(job_id)
+    resume_ids = pgres_client.read_candidates_from_job("", save_to_file=False)
+
+    # 2. for each resume, call classification_wrapper
+    for resume_id in resume_ids:
+        create_classification_wrapper(job_id, resume_id=resume_id)
 
 
 def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
