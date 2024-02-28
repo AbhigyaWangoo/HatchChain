@@ -4,7 +4,7 @@ from llm.client import gpt, runpod
 from llm.prompt import few_shot, cot, dspy
 
 PROMPT_CRAFTER = "prompt_crafter"
-
+DATASET="data/dspy/dataset_10.json"
 
 class AbstractClassifier(ABC):
     def __init__(self, hyperparams: List[str], **kwargs) -> None:
