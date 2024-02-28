@@ -1,5 +1,6 @@
 from query_engine.src.db import postgres_client, rawtxt_client
 import multiprocessing
+from llm.client.base import get_navigation_string
 from classifier import decisiontree
 from similarity import cosine
 import enum
@@ -116,6 +117,7 @@ def get_classifier(
                 job_description=job_metadata,
                 category=category,
                 consider_keywords=False,
+                **{"prompt_crafter": get_navigation_string},
             )
 
             print("Classifier created")

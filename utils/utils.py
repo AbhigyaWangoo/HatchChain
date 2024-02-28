@@ -150,7 +150,24 @@ def lbl_to_resumeset_multiproc(
 
     return res
 
+
 def generate_random_integer(n: int):
-    """ Generates a random int from 1 to n inclusive """
+    """Generates a random int from 1 to n inclusive"""
     random_number = random.randint(1, n)
     return random_number
+
+
+def track_heuristics(node, res, input_str):
+    import json
+
+    with open("tracker.json", "r", encoding="utf8") as fp:
+        data = json.load(fp)
+        data.append(
+            {
+                "heuristic": node.heuristic,
+                "navigation": res,
+                "input resume": input_str,
+            }
+        )
+        with open("tracker.json", "w", encoding="utf8") as fp:
+            json.dump(data, fp)

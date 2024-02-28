@@ -11,6 +11,7 @@ import multiprocessing
 import pickle
 from random import shuffle
 import os
+from llm.client.base import get_navigation_string
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from sklearn.model_selection import GridSearchCV
@@ -119,8 +120,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         load_file: str = EMPTY_STRING,
         _heuristic_ct: int = 5,
         consider_keywords: bool = True,
+        **kwargs,
     ) -> None:
-        super().__init__(hyperparams)
+        super().__init__(hyperparams, **kwargs)
         self._hyperparam_lst: List[HyperParameter] = []
         for param in hyperparams:
             self._hyperparam_lst.append(HyperParameter(param))
@@ -483,26 +485,16 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return win_map, loss_map
 
-    def get_navigation_string(self, heuristic: str, input_str: str) -> str:
-        """ Returns a crafted heuristic prompt based on the provided args """
-        
-        return f"""
-        You have a candidate and a label. On the bases of the following heuristcs
-        here: {heuristic} decide whether the following candidate: {input_str} fits the category 
-        of {self._category.name}. When providing a reasoning, only reference the specific heuristics provided,
-        all your lines of reasoning should be relevant to the provided heuristic.
-        
-        Your output should always be modelled as follows:
-        reject | accept:<reasoning for why the candidate should be accepted or rejected>
-        """
-
     def _navigate(
         self, node: Node, input_str: str, max_retry: int = 0
     ) -> Tuple[bool, str]:
-        navigation_str = self.get_navigation_string(node.heuristic, input_str)
+        navigation_str = get_navigation_string(
+            node.heuristic, input_str, self._category.name
+        )
 
         try:
             res = self._prompter.prompt(navigation_str)
+            print(res)
         except Exception:  # Handling runpod failure case
             res = self.prompt_wrapper(navigation_str)
 
