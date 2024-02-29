@@ -12,6 +12,7 @@ import pickle
 from random import shuffle
 import os
 from llm.client.base import get_navigation_string
+from llm.prompt.cot import ZERO_SHOT_PROMPT
 
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from sklearn.model_selection import GridSearchCV
@@ -226,18 +227,19 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
+        # The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
+
         merging_prompt = f"""
             You are given the following reasonings to accept a candidate for a job here:
             {' '.join(list(win_map.values()))}
             And the following reasongs to reject that candidate for the job here:
             {' '.join(list(loss_map.values()))}
             
-            The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
-            
             Given that this candidate should be {verdict.value}ed, Generate a final
-            reasoning paragraph that has the same number of sentences as all the reasonings combined.
-            Preserve each sentence, and do not summarize or eliminate data. Specifically reiterate that 
-            the candidate should be {verdict.value}ed
+            reasoning paragraph that is all of the provided reasonings concatenated. Your emphasis 
+            should be purely on improving grammar while preserving the data integrity and meaningfulness 
+            Do not eliminate any reasonings. Specifically reiterate that the candidate should be 
+            {verdict.value}ed, and provide no mention of heuristics. {ZERO_SHOT_PROMPT}
         """
 
         reasonings_str = self.prompt_wrapper(merging_prompt)
@@ -485,6 +487,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         return win_map, loss_map
 
+    def filter(self, prompt: str) -> str:
+        """ 
+        heuristic prompt response processing 
+        """
+        return prompt
+
     def _navigate(
         self, node: Node, input_str: str, max_retry: int = 0
     ) -> Tuple[bool, str]:
@@ -494,17 +502,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         try:
             res = self._prompter.prompt(navigation_str)
-            print(res)
         except Exception:  # Handling runpod failure case
             res = self.prompt_wrapper(navigation_str)
 
         try:
-            reasoning = res.split(":")[-1]
-
             reject_ct = res.lower().count("reject")
             accept_ct = res.lower().count("accept")
 
-            return accept_ct > reject_ct, reasoning
+            return accept_ct > reject_ct, self.filter(res)
         except Exception as e:
             error_str = f"""
                 Error reading information from navigation. Nav response for 
