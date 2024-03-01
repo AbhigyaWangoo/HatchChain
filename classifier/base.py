@@ -16,7 +16,7 @@ class AbstractClassifier(ABC):
 
         if PROMPT_CRAFTER in kwargs:
             self._prompter = dspy.DSPyPrompter(
-                self._runpod_client, "dataset_10.json", kwargs[PROMPT_CRAFTER]
+                self._runpod_client, DATASET, kwargs[PROMPT_CRAFTER]
             )
         else:
             self._prompter = cot.ChainOfThoughtPrompter(self._runpod_client)

@@ -18,7 +18,12 @@ if not os.path.exists(SERVER_ROOT_DATAPATH):
 CLASSIFIERS_ROOT_DATAPATH = "data/classifiers/"
 if not os.path.exists(CLASSIFIERS_ROOT_DATAPATH):
     os.mkdir(CLASSIFIERS_ROOT_DATAPATH)
+RESUMES_ROOT_DATAPATH = "data/resumes/"
+if not os.path.exists(RESUMES_ROOT_DATAPATH):
+    os.mkdir(RESUMES_ROOT_DATAPATH)
+
 NUM_SIMILAR = 5
+
 
 active_classifications = set()
 active_classifiers = set()
@@ -117,7 +122,7 @@ def get_classifier(
                 job_description=job_metadata,
                 category=category,
                 consider_keywords=False,
-                **{"prompt_crafter": get_navigation_string},
+                # **{"prompt_crafter": get_navigation_string},
             )
 
             print("Classifier created")
@@ -199,6 +204,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     try:
         # 1. declare client
         client = postgres_client.PostgresClient(job_id)
+        rt_client = rawtxt_client.ResumeDynamoClient(job_id)
 
         # 2. Try to read prev job_resume binding.
         # TODO add disk level caching for classification reasoning?
@@ -213,10 +219,11 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             print("First time classifying candidate.")
 
             # 3. Reading client metadata
-            candidate_metadata = client.read_candidate(
-                resume_id, postgres_client.RESUME_DATA_FIELD
-            )
-            strdata = json.dumps(candidate_metadata)
+            # candidate_metadata = client.read_candidate(
+            #     resume_id, postgres_client.RESUME_DATA_FIELD
+            # )
+            strdata = rt_client.get_resume(str(resume_id), os.path.join(RESUMES_ROOT_DATAPATH, str(resume_id)))
+            # strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
             accept, reasoning = classifier.classify(strdata)

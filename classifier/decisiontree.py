@@ -153,10 +153,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         """
 
         try:
-            return self._prompt_runpod(prompt)
+            return self._prompter.prompt(prompt)
         except (ConnectionError, ValueError):
-            print("Runpod failed. Trying with gpt client.")
-            return self._prompt_gpt(prompt)
+
+            try:
+                return self._prompt_runpod(prompt)
+            except (ConnectionError, ValueError):
+                print("Runpod failed. Trying with gpt client.")
+                return self._prompt_gpt(prompt)
 
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
@@ -214,7 +218,10 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return True
 
     def _coalesce_response(
-        self, win_map: Dict[HyperParameter, str], loss_map: Dict[HyperParameter, str]
+        self,
+        win_map: Dict[HyperParameter, str],
+        loss_map: Dict[HyperParameter, str],
+        iters: int = 2,
     ) -> Tuple[ClassificationOutput, str]:
 
         verdict: ClassificationOutput
@@ -230,17 +237,25 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         # The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
 
         merging_prompt = f"""
-            You are given the following reasonings to accept a candidate for a job here:
-            {' '.join(list(win_map.values()))}
-            And the following reasongs to reject that candidate for the job here:
-            {' '.join(list(loss_map.values()))}
+            You are a recruiter, and are given the following set of reasonings for whether 
+            to reject or accept a candidate for a job:
+            {' '.join(list(win_map.values())) + '. ' + ' '.join(list(loss_map.values()))}
             
-            Given that this candidate should be {verdict.value}ed, Generate a final
-            reasoning paragraph that is all of the provided reasonings concatenated. Your emphasis 
-            should be purely on improving grammar while preserving the data integrity and meaningfulness 
-            Do not eliminate any reasonings. Specifically reiterate that the candidate should be 
-            {verdict.value}ed, and provide no mention of heuristics. {ZERO_SHOT_PROMPT}
+            Given that this candidate should be {verdict.value}ed, perform the following operations:
+            1. Generate a grammatically perfect, concatenated version of all provided reasonings above. 
+            2. Clearly state that this candidate should be {verdict.value}ed
+            3. Only reference data or draw conclusions from information pertaining to the resume or job.
+               Your output should make it clear what each reasoning implies, and what data it references.
         """
+        # Given that this candidate should be {verdict.value}ed, Generate a final
+        # reasoning paragraph that is all of the provided reasonings concatenated. Your emphasis
+        # should be purely on providing a perfectly grammatically sound paragraph
+        # while preserving the data integrity and meaningfulness. Do not eliminate any
+        # reasonings. Specifically reiterate that the candidate should be
+        # {verdict.value}ed. You should have no grammar errors. {ZERO_SHOT_PROMPT}.
+        # further_iteration_prompt = f"""
+
+        # """
 
         reasonings_str = self.prompt_wrapper(merging_prompt)
 
@@ -488,8 +503,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         return win_map, loss_map
 
     def filter(self, prompt: str) -> str:
-        """ 
-        heuristic prompt response processing 
+        """
+        heuristic prompt response processing
         """
         return prompt
 
