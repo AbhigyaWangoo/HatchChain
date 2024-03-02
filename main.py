@@ -2,15 +2,15 @@
 # from dspy.evaluate import Evaluate
 # import dspy
 # from dspy.datasets.gsm8k import GSM8K, gsm8k_metric
-from classifier.decisiontree import ExplainableTreeClassifier
-import openai
+# from classifier.decisiontree import ExplainableTreeClassifier
+# import openai
 import os
 import pickle
 from typing import Dict, Set, List
 
 from utils.utils import read_from, TESTDIR, LABELS
 
-client = openai.OpenAI()
+# client = openai.OpenAI()
 
 
 def run_binclassifier(dir_path: str, n: int = -1) -> Dict[str, str]:

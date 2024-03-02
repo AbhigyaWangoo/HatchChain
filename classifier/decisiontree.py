@@ -2,6 +2,7 @@ from utils.utils import lbl_to_resumeset_multiproc
 from similarity.cosine import CosineSimilarity
 from collections import OrderedDict
 from . import base
+import traceback
 import json
 from typing import Any, List, Tuple, Dict
 from abc import ABC
@@ -141,9 +142,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                     f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file."
                 )
         else:
-            # print("Generating heuristic list in classifier.")
             self._heuristic_list = self._generate_heuristic_list(consider_keywords)
-            # print("Generated!")
 
         self._root = self._construct_linked_list(root=None, idx=0)
 
@@ -155,12 +154,14 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         try:
             return self._prompter.prompt(prompt)
         except (ConnectionError, ValueError):
-
             try:
                 return self._prompt_runpod(prompt)
             except (ConnectionError, ValueError):
                 print("Runpod failed. Trying with gpt client.")
                 return self._prompt_gpt(prompt)
+        except Exception:
+            print("Hugging face querying failed")
+            traceback.print_exc()
 
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
@@ -254,7 +255,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         # reasonings. Specifically reiterate that the candidate should be
         # {verdict.value}ed. You should have no grammar errors. {ZERO_SHOT_PROMPT}.
         # further_iteration_prompt = f"""
-
         # """
 
         reasonings_str = self.prompt_wrapper(merging_prompt)
@@ -515,10 +515,12 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             node.heuristic, input_str, self._category.name
         )
 
-        try:
-            res = self._prompter.prompt(navigation_str)
-        except Exception:  # Handling runpod failure case
-            res = self.prompt_wrapper(navigation_str)
+        res = self._mistral_client.query(navigation_str)
+
+        # try:
+        #     res = self._prompter.prompt(navigation_str)
+        # except Exception:  # Handling runpod failure case
+        #     res = self.prompt_wrapper(navigation_str)
 
         try:
             reject_ct = res.lower().count("reject")
