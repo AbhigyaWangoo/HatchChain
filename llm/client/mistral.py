@@ -8,7 +8,6 @@ load_dotenv()
 
 API_KEY = os.environ["MISTRAL_API_KEY"]
 MODEL = "open-mixtral-8x7b"
-LARGE_MODEL = "mistral-large-latest"
 
 
 class MistralLLMClient(base.AbstractLLM):
@@ -18,9 +17,7 @@ class MistralLLMClient(base.AbstractLLM):
         super().__init__()
         self._client = MistralClient(api_key=API_KEY)
 
-    def query(
-        self, prompt: str, model: str = MODEL, temperature: int = 0.2
-    ) -> str:
+    def query(self, prompt: str, model: str = MODEL, temperature: int = 0.2) -> str:
         """A simple wrapper to the mistral api"""
 
         messages = [ChatMessage(role="user", content=prompt)]

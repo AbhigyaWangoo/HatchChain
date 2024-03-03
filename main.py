@@ -72,7 +72,7 @@ if __name__ == "__main__":
     client = MistralLLMClient()
     prompter = ChainOfVerification(client)
 
-    query="""
+    query = """
         resume: {"name": "ZAKIYA (Kia) HILL", "educations": [{"gpa": "3.54", "degree": "Bachelors", "majors": ["Economics", "Business"], "grad_year": "2020", "institution": "University of Illinois at Urbana-Champaign"}], "experiences": [{"skills": {"training": 1, "POS system": 1, "scheduling": 1, "customer service": 1}, "impacts": ["Processed cash, credit, and WIC payments", "Encouraged sales of credit cards and product protection plans"], "end_date": "Present", "location": "Bolingbrook, IL", "role_title": "Cashier", "start_date": "December 2017", "organization": "Wal-Mart"}, {"skills": {"visual design": 1, "public speaking": 1, "financial budgeting": 1}, "impacts": ["Prepared and conducted presentations about suicide prevention", "Managed a financial budget for an annual fashion show"], "end_date": "April 2018", "location": "Chicago, IL", "role_title": "Suicide Prevention Ambassador", "start_date": "June 2016", "organization": "Live Out Loud Charity"}, {"skills": {"organization": 1, "academic support": 1, "active listening": 1}, "impacts": ["Provided resources & academic support to middle school students", "Actively listened to students\' issues & offered support"], "end_date": "May 2016", "location": "Bolingbrook, IL", "role_title": "Lead Junior Mentor", "start_date": "August 2015", "organization": "Bolingbrook Community Center"}], "general_skills": {"training": 1, "POS system": 1, "scheduling": 1, "organization": 1, "visual design": 1, "public speaking": 1, "academic support": 1, "active listening": 1, "customer service": 1, "financial budgeting": 1}, "years_of_experience": 3}
 
         job requirements: Based on the job description provided, here are five precise skills-related qualities that can make a candidate strong for the Machine Learning Engineer position, along with heuristics relevant to the category:
@@ -110,4 +110,9 @@ if __name__ == "__main__":
 
         Answer:
     """
-    prompter.prompt(query)
+    raw_response=client.query(query)
+    verified_response = prompter.prompt(query)
+
+    print(raw_response)
+    print("\n\n\n\n\n")
+    print(verified_response)

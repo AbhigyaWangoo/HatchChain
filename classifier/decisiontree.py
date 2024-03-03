@@ -146,31 +146,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         self._root = self._construct_linked_list(root=None, idx=0)
 
-    def prompt_wrapper(self, prompt: str, attempt_runpod_first: bool = False) -> str:
-        """
-        A failure wrapper around prompting. Prioritized runpod for now.
-        """
-
-        # return self._prompt_gpt(prompt)
-
-        try:
-            if attempt_runpod_first:
-                return self._prompt_runpod(prompt)
-            else:
-                return self._prompter.prompt(prompt)
-        except (ConnectionError, ValueError):
-            try:
-                if attempt_runpod_first:
-                    return self._prompter.prompt(prompt)
-                else:
-                    return self._prompt_runpod(prompt)
-            except (ConnectionError, ValueError):
-                print("Runpod and mistral failed. Trying with gpt client.")
-                return self._prompt_gpt(prompt)
-        except Exception:
-            print("Prompt wrapper failed")
-            traceback.print_exc()
-
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
         if not os.path.exists(path):
@@ -258,7 +233,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             answer: {ZERO_SHOT_PROMPT}
         """
 
-        reasonings_str = self.prompt_wrapper(merging_prompt)
+        reasonings_str = self._mistral_client.query(merging_prompt)
 
         return verdict, reasonings_str
 
@@ -516,7 +491,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             node.heuristic, input_str, self._category.name
         )
 
-        res = self.prompt_wrapper(navigation_str, True)
+        res = self._prompter.prompt(navigation_str)
 
         try:
             reject_ct = res.lower().count("reject")
@@ -561,8 +536,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             if self._job_description is not None:
                 heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on and job description's ideal qualities, and reference them when generating heuristics."
 
-            heuristic = self.prompt_wrapper(heuristic_prompt)
-            print(heuristic)
+            heuristic = self._prompter.prompt(heuristic_prompt)
             heuristics.append(heuristic)
 
         if consider_keywords:

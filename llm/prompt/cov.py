@@ -21,7 +21,11 @@ class ChainOfVerification(base.Prompter):
     client as an argument and provides a common interface to all the prompting classes.
     """
 
-    def __init__(self, client: llm.AbstractLLM, execution_type: VerificationType = VerificationType.JOINT) -> None:
+    def __init__(
+        self,
+        client: llm.AbstractLLM,
+        execution_type: VerificationType = VerificationType.JOINT,
+    ) -> None:
         super().__init__(client)
         self._execution_type = execution_type
 
@@ -68,11 +72,7 @@ class ChainOfVerification(base.Prompter):
 
         return response
 
-    def _execute_verifications(
-        self,
-        response: str,
-        verifications: str
-    ) -> str:
+    def _execute_verifications(self, response: str, verifications: str) -> str:
         """
         3. Execute Verifications: Answer each verification question in turn,
         and hence check the answer against the original response to check
@@ -105,4 +105,16 @@ class ChainOfVerification(base.Prompter):
         4. Generate Final Verified Response: Given the discovered inconsistencies
         (if any), generate a revised response incorporating the verification results
         """
-        return ""
+
+        final_verified_response_generator = f"""
+            Given the following inconsistancies: {inconsistancies}
+            
+            And the following response: {response}
+        
+            Generate a final, revised response with all the fixes based on 
+            the inconsistancies.
+        """
+
+        final_response = self._client.query(final_verified_response_generator)
+
+        return final_response
