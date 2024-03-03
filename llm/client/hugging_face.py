@@ -2,14 +2,15 @@ from huggingface_hub import get_inference_endpoint, InferenceEndpoint
 from . import base
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 ZEPHYR_ENDPOINT_NAME = "zephyr-7b-beta-kas"
 ZEPHYR_QNA_ENDPOINT_NAME = "zephyr-7b-qna-uht"
 MISTRAL_ENDPOINT_NAME = "mixtral-8x7b-instruct-v0-1-tgo"
 
-HUGGING_FACE_TOKEN=os.environ.get("HUGGING_FACE_TOKEN")
-    
+HUGGING_FACE_TOKEN = os.environ.get("HUGGING_FACE_TOKEN")
+
 
 class HuggingFaceClient(base.AbstractLLM):
     """
@@ -31,9 +32,7 @@ class HuggingFaceClient(base.AbstractLLM):
         if HUGGING_FACE_TOKEN is None:
             raise ValueError("HUGGING_FACE_TOKEN env var is not set in .env file.")
 
-        endpoint = get_inference_endpoint(
-            inference_endpoint, token=HUGGING_FACE_TOKEN
-        )
+        endpoint = get_inference_endpoint(inference_endpoint, token=HUGGING_FACE_TOKEN)
 
         try:
             endpoint.resume()

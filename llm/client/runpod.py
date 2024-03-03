@@ -76,7 +76,7 @@ class RunPodClient(base.AbstractLLM):
                     "n": 1,
                     "presence_penalty": 0.2,
                     "frequency_penalty": 0.7,
-                    "temperature": 0.3,
+                    "temperature": 0.1,
                 },
             }
         }
@@ -116,6 +116,8 @@ class RunPodClient(base.AbstractLLM):
                 raise ConnectionError(
                     f"Runpod client job had error {status}. Please try a different client at this time"
                 )
+            else:
+                break
 
         if status == RunPodStatus.TIMED_OUT:
             raise ConnectionError(

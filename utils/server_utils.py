@@ -226,6 +226,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             del candidate_metadata["email"]
             del candidate_metadata["phone"]
             del candidate_metadata["links"]
+            print(candidate_metadata)
             # strdata = rt_client.get_resume(
             #     str(resume_id), os.path.join(RESUMES_ROOT_DATAPATH, str(resume_id))
             # )
@@ -234,6 +235,9 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             )  # Possible replace this with a more explainable reasoning
 
             classifier = get_classifier(job_id, False)
+            if isinstance(classifier, str):
+                print(classifier)
+                return
             accept, reasoning = classifier.classify(strdata)
 
             if accept == decisiontree.ClassificationOutput.TIE:

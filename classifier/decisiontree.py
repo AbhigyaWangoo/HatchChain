@@ -146,18 +146,26 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
 
         self._root = self._construct_linked_list(root=None, idx=0)
 
-    def prompt_wrapper(self, prompt: str) -> str:
+    def prompt_wrapper(self, prompt: str, attempt_runpod_first: bool = False) -> str:
         """
         A failure wrapper around prompting. Prioritized runpod for now.
         """
 
+        # return self._prompt_gpt(prompt)
+
         try:
-            return self._prompter.prompt(prompt)
+            if attempt_runpod_first:
+                return self._prompt_runpod(prompt)
+            else:
+                return self._prompter.prompt(prompt)
         except (ConnectionError, ValueError):
             try:
-                return self._prompt_runpod(prompt)
+                if attempt_runpod_first:
+                    return self._prompter.prompt(prompt)
+                else:
+                    return self._prompt_runpod(prompt)
             except (ConnectionError, ValueError):
-                print("Runpod failed. Trying with gpt client.")
+                print("Runpod and mistral failed. Trying with gpt client.")
                 return self._prompt_gpt(prompt)
         except Exception:
             print("Prompt wrapper failed")
@@ -235,6 +243,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
+        print(win_map)
+        print(loss_map)
+
         merging_prompt = f"""
             question: You are a recruiter, and are given the following set of reasonings for whether 
             to reject or accept a candidate for a job:
@@ -243,9 +254,6 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             Given that this candidate should be {verdict.value}ed, perform the following operations:
             1. Generate a grammatically perfect, concatenated version of all provided reasonings above. 
             2. Clearly state that this candidate should be {verdict.value}ed
-            3. Only reference data or draw conclusions from information pertaining to the resume or job.
-            4. The user is a hiring managar who has only see the resume, and seeks an explainable reasoning for why 
-            they should reject or accept a candidate. Model the final answer as such.
 
             answer: {ZERO_SHOT_PROMPT}
         """
@@ -477,21 +485,21 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     def _traverse_with_input(
         self,
         cur_node: Node,
-        input: str,
+        input_str: str,
         win_map: Dict[HyperParameter, str],
         loss_map: Dict[HyperParameter, str],
     ) -> Tuple[Dict[HyperParameter, str], Dict[HyperParameter, str]]:
         """Traverses the tree with the input, uses comparison function to generate wins or losses"""
 
         if cur_node is not None:
-            pass_heuristic, reason = self._navigate(cur_node, input, 2)
+            pass_heuristic, reason = self._navigate(cur_node, input_str, 2)
 
             if pass_heuristic:
                 win_map[cur_node.hyperparameter_level] = reason
             else:
                 loss_map[cur_node.hyperparameter_level] = reason
 
-            self._traverse_with_input(cur_node.next, input, win_map, loss_map)
+            self._traverse_with_input(cur_node.next, input_str, win_map, loss_map)
 
         return win_map, loss_map
 
@@ -508,7 +516,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             node.heuristic, input_str, self._category.name
         )
 
-        res = self.prompt_wrapper(navigation_str)
+        res = self.prompt_wrapper(navigation_str, True)
 
         try:
             reject_ct = res.lower().count("reject")
