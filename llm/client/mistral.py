@@ -3,10 +3,12 @@ import os
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from dotenv import load_dotenv
+
 load_dotenv()
 
 API_KEY = os.environ["MISTRAL_API_KEY"]
 MODEL = "open-mixtral-8x7b"
+
 
 class MistralLLMClient(base.AbstractLLM):
     """A client module to call the mistral API"""
@@ -15,14 +17,10 @@ class MistralLLMClient(base.AbstractLLM):
         super().__init__()
         self._client = MistralClient(api_key=API_KEY)
 
-    def query(
-        self, prompt: str
-    ) -> str:
+    def query(self, prompt: str) -> str:
         """A simple wrapper to the mistral api"""
 
-        messages = [
-            ChatMessage(role="user", content=prompt)
-        ]
+        messages = [ChatMessage(role="user", content=prompt)]
 
         # No streaming
         chat_response = self._client.chat(

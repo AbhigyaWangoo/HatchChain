@@ -229,7 +229,9 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             # strdata = rt_client.get_resume(
             #     str(resume_id), os.path.join(RESUMES_ROOT_DATAPATH, str(resume_id))
             # )
-            strdata = json.dumps(candidate_metadata) # Possible replace this with a more explainable reasoning
+            strdata = json.dumps(
+                candidate_metadata
+            )  # Possible replace this with a more explainable reasoning
 
             classifier = get_classifier(job_id, False)
             accept, reasoning = classifier.classify(strdata)
