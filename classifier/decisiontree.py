@@ -160,7 +160,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 print("Runpod failed. Trying with gpt client.")
                 return self._prompt_gpt(prompt)
         except Exception:
-            print("Hugging face querying failed")
+            print("Prompt wrapper failed")
             traceback.print_exc()
 
     def save_model(self, path: str) -> Dict[Any, Any]:
@@ -235,10 +235,8 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
-        # The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
-
         merging_prompt = f"""
-            You are a recruiter, and are given the following set of reasonings for whether 
+            question: You are a recruiter, and are given the following set of reasonings for whether 
             to reject or accept a candidate for a job:
             {' '.join(list(win_map.values())) + '. ' + ' '.join(list(loss_map.values()))}
             
@@ -246,16 +244,11 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             1. Generate a grammatically perfect, concatenated version of all provided reasonings above. 
             2. Clearly state that this candidate should be {verdict.value}ed
             3. Only reference data or draw conclusions from information pertaining to the resume or job.
-               Your output should make it clear what each reasoning implies, and what data it references.
+            4. The user is a hiring managar who has only see the resume, and seeks an explainable reasoning for why 
+            they should reject or accept a candidate. Model the final answer as such.
+
+            answer: {ZERO_SHOT_PROMPT}
         """
-        # Given that this candidate should be {verdict.value}ed, Generate a final
-        # reasoning paragraph that is all of the provided reasonings concatenated. Your emphasis
-        # should be purely on providing a perfectly grammatically sound paragraph
-        # while preserving the data integrity and meaningfulness. Do not eliminate any
-        # reasonings. Specifically reiterate that the candidate should be
-        # {verdict.value}ed. You should have no grammar errors. {ZERO_SHOT_PROMPT}.
-        # further_iteration_prompt = f"""
-        # """
 
         reasonings_str = self.prompt_wrapper(merging_prompt)
 
@@ -515,12 +508,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             node.heuristic, input_str, self._category.name
         )
 
-        res = self._mistral_client.query(navigation_str)
-
-        # try:
-        #     res = self._prompter.prompt(navigation_str)
-        # except Exception:  # Handling runpod failure case
-        #     res = self.prompt_wrapper(navigation_str)
+        res = self.prompt_wrapper(navigation_str)
 
         try:
             reject_ct = res.lower().count("reject")
@@ -566,6 +554,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                 heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on and job description's ideal qualities, and reference them when generating heuristics."
 
             heuristic = self.prompt_wrapper(heuristic_prompt)
+            print(heuristic)
             heuristics.append(heuristic)
 
         if consider_keywords:
