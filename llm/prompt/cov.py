@@ -21,7 +21,7 @@ class ChainOfVerification(base.Prompter):
     client as an argument and provides a common interface to all the prompting classes.
     """
 
-    def __init__(self, client: llm.AbstractLLM, execution_type: VerificationType = VerificationType.TWO_STEP) -> None:
+    def __init__(self, client: llm.AbstractLLM, execution_type: VerificationType = VerificationType.JOINT) -> None:
         super().__init__(client)
         self._execution_type = execution_type
 
@@ -34,6 +34,10 @@ class ChainOfVerification(base.Prompter):
         baseline_response = self._client.query(prompt)
 
         verifications = self._generate_verifications(prompt, baseline_response)
+
+        if self._execution_type == VerificationType.JOINT:
+            return self._generate_verified_response(verifications, baseline_response)
+
         inconsistancies = self._execute_verifications(baseline_response, verifications)
 
         return self._generate_verified_response(inconsistancies, baseline_response)
@@ -53,6 +57,12 @@ class ChainOfVerification(base.Prompter):
             For each fact provided in the response, generate a question that 
             can be used to verify the correctness of the fact.
         """
+
+        if self._execution_type == VerificationType.JOINT:
+            verification_planning_prompt += """
+                From each of the questions generated, check the reponse to ensure that the information is accurate.
+                Your final response should be a list of all the facts from the baseline response.
+            """
 
         response = self._client.query(verification_planning_prompt)
 
