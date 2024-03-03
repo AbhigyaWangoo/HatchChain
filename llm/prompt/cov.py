@@ -21,8 +21,9 @@ class ChainOfVerification(base.Prompter):
     client as an argument and provides a common interface to all the prompting classes.
     """
 
-    def __init__(self, client: llm.AbstractLLM) -> None:
+    def __init__(self, client: llm.AbstractLLM, execution_type: VerificationType = VerificationType.TWO_STEP) -> None:
         super().__init__(client)
+        self._execution_type = execution_type
 
     def prompt(self, prompt: str) -> str:
         """
@@ -55,21 +56,38 @@ class ChainOfVerification(base.Prompter):
 
         response = self._client.query(verification_planning_prompt)
 
-        print(f"Verification questions created: {response}")
-
         return response
 
     def _execute_verifications(
         self,
         response: str,
-        verifications: str,
-        execution_type: VerificationType = VerificationType.JOINT,
+        verifications: str
     ) -> str:
         """
         3. Execute Verifications: Answer each verification question in turn,
         and hence check the answer against the original response to check
         for inconsistencies or mistakes.
         """
+
+        if self._execution_type == VerificationType.TWO_STEP:
+            verification_execution_prompt = f"""
+                Please provide answers to the following verification questions one at a time.
+                
+                {verifications}
+                
+                For the provided response
+                
+                {response}
+            """
+
+            hallucinations_detected = self._client.query(verification_execution_prompt)
+
+            return hallucinations_detected
+
+        elif self._execution_type == VerificationType.FACTORED:
+            # TODO implement if two step is not performing well enough
+            pass
+
         return ""
 
     def _generate_verified_response(self, inconsistancies: str, response: str) -> str:

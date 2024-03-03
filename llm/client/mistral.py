@@ -19,7 +19,7 @@ class MistralLLMClient(base.AbstractLLM):
         self._client = MistralClient(api_key=API_KEY)
 
     def query(
-        self, prompt: str, model: str = LARGE_MODEL, temperature: int = 0.2
+        self, prompt: str, model: str = MODEL, temperature: int = 0.2
     ) -> str:
         """A simple wrapper to the mistral api"""
 
