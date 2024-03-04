@@ -1,4 +1,5 @@
 from query_engine.src.db import postgres_client, rawtxt_client
+import traceback
 import multiprocessing
 from llm.client.base import get_navigation_string
 from classifier import decisiontree
@@ -18,7 +19,12 @@ if not os.path.exists(SERVER_ROOT_DATAPATH):
 CLASSIFIERS_ROOT_DATAPATH = "data/classifiers/"
 if not os.path.exists(CLASSIFIERS_ROOT_DATAPATH):
     os.mkdir(CLASSIFIERS_ROOT_DATAPATH)
+RESUMES_ROOT_DATAPATH = "data/resumes/"
+if not os.path.exists(RESUMES_ROOT_DATAPATH):
+    os.mkdir(RESUMES_ROOT_DATAPATH)
+
 NUM_SIMILAR = 5
+
 
 active_classifications = set()
 active_classifiers = set()
@@ -117,7 +123,7 @@ def get_classifier(
                 job_description=job_metadata,
                 category=category,
                 consider_keywords=False,
-                **{"prompt_crafter": get_navigation_string},
+                # **{"prompt_crafter": get_navigation_string},
             )
 
             print("Classifier created")
@@ -215,10 +221,16 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             # 3. Reading client metadata
             candidate_metadata = client.read_candidate(
                 resume_id, postgres_client.RESUME_DATA_FIELD
-            )
+            )[0]
+            del candidate_metadata["email"]
+            del candidate_metadata["phone"]
+            del candidate_metadata["links"]
             strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
+            if isinstance(classifier, str):
+                print(classifier)
+                return
             accept, reasoning = classifier.classify(strdata)
 
             if accept == decisiontree.ClassificationOutput.TIE:
@@ -253,6 +265,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
         active_classifications.remove((job_id, resume_id))
         err_msg = f"Classification on resume {resume_id} failed, error: {e}"
         print(err_msg)
+        traceback.print_exc()
 
         return {"reccommendation": False, "reasoning": "", "message": err_msg}
 

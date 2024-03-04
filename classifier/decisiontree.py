@@ -2,6 +2,7 @@ from utils.utils import lbl_to_resumeset_multiproc
 from similarity.cosine import CosineSimilarity
 from collections import OrderedDict
 from . import base
+import traceback
 import json
 from typing import Any, List, Tuple, Dict
 from abc import ABC
@@ -141,22 +142,9 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
                     f"File {load_file} does not exist to load a file from. Please verify the classifier is receiving the correct file."
                 )
         else:
-            # print("Generating heuristic list in classifier.")
             self._heuristic_list = self._generate_heuristic_list(consider_keywords)
-            # print("Generated!")
 
         self._root = self._construct_linked_list(root=None, idx=0)
-
-    def prompt_wrapper(self, prompt: str) -> str:
-        """
-        A failure wrapper around prompting. Prioritized runpod for now.
-        """
-
-        try:
-            return self._prompt_runpod(prompt)
-        except (ConnectionError, ValueError):
-            print("Runpod failed. Trying with gpt client.")
-            return self._prompt_gpt(prompt)
 
     def save_model(self, path: str) -> Dict[Any, Any]:
         mode = "w"
@@ -214,7 +202,10 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             return True
 
     def _coalesce_response(
-        self, win_map: Dict[HyperParameter, str], loss_map: Dict[HyperParameter, str]
+        self,
+        win_map: Dict[HyperParameter, str],
+        loss_map: Dict[HyperParameter, str],
+        iters: int = 2,
     ) -> Tuple[ClassificationOutput, str]:
 
         verdict: ClassificationOutput
@@ -227,22 +218,22 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
-        # The job is given here: {self._job_description[postgres_client.DESCRIPTION_DATA_FIELD]}
+        print(win_map)
+        print(loss_map)
 
         merging_prompt = f"""
-            You are given the following reasonings to accept a candidate for a job here:
-            {' '.join(list(win_map.values()))}
-            And the following reasongs to reject that candidate for the job here:
-            {' '.join(list(loss_map.values()))}
+            question: You are a recruiter, and are given the following set of reasonings for whether 
+            to reject or accept a candidate for a job:
+            {' '.join(list(win_map.values())) + '. ' + ' '.join(list(loss_map.values()))}
             
-            Given that this candidate should be {verdict.value}ed, Generate a final
-            reasoning paragraph that is all of the provided reasonings concatenated. Your emphasis 
-            should be purely on improving grammar while preserving the data integrity and meaningfulness 
-            Do not eliminate any reasonings. Specifically reiterate that the candidate should be 
-            {verdict.value}ed, and provide no mention of heuristics. {ZERO_SHOT_PROMPT}
+            Given that this candidate should be {verdict.value}ed, perform the following operations:
+            1. Generate a grammatically perfect, concatenated version of all provided reasonings above. 
+            2. Clearly state that this candidate should be {verdict.value}ed
+
+            answer: {ZERO_SHOT_PROMPT}
         """
 
-        reasonings_str = self.prompt_wrapper(merging_prompt)
+        reasonings_str = self._mistral_client.query(merging_prompt)
 
         return verdict, reasonings_str
 
@@ -469,27 +460,27 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
     def _traverse_with_input(
         self,
         cur_node: Node,
-        input: str,
+        input_str: str,
         win_map: Dict[HyperParameter, str],
         loss_map: Dict[HyperParameter, str],
     ) -> Tuple[Dict[HyperParameter, str], Dict[HyperParameter, str]]:
         """Traverses the tree with the input, uses comparison function to generate wins or losses"""
 
         if cur_node is not None:
-            pass_heuristic, reason = self._navigate(cur_node, input, 2)
+            pass_heuristic, reason = self._navigate(cur_node, input_str, 2)
 
             if pass_heuristic:
                 win_map[cur_node.hyperparameter_level] = reason
             else:
                 loss_map[cur_node.hyperparameter_level] = reason
 
-            self._traverse_with_input(cur_node.next, input, win_map, loss_map)
+            self._traverse_with_input(cur_node.next, input_str, win_map, loss_map)
 
         return win_map, loss_map
 
     def filter(self, prompt: str) -> str:
-        """ 
-        heuristic prompt response processing 
+        """
+        heuristic prompt response processing
         """
         return prompt
 
@@ -500,10 +491,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             node.heuristic, input_str, self._category.name
         )
 
-        try:
-            res = self._prompter.prompt(navigation_str)
-        except Exception:  # Handling runpod failure case
-            res = self.prompt_wrapper(navigation_str)
+        res = self._prompter.prompt(navigation_str)
 
         try:
             reject_ct = res.lower().count("reject")
@@ -548,7 +536,7 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
             if self._job_description is not None:
                 heuristic_prompt += f"You are given the following information about the job description as well: {self._job_description}. You should focus on and job description's ideal qualities, and reference them when generating heuristics."
 
-            heuristic = self.prompt_wrapper(heuristic_prompt)
+            heuristic = self._prompter.prompt(heuristic_prompt)
             heuristics.append(heuristic)
 
         if consider_keywords:

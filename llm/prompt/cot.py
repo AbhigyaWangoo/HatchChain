@@ -122,23 +122,6 @@ Based on the above reasonings, Aayush should be rejected for the role of Machine
 and has good communicatin skills, his level of skills is not enough to warrant an acceptance to this position. Overall, the heuristics require to succeed in this role are too different from those that Aayush possesses, 
 making it logical to reject him for this role.
 """
-# Example 3:
-# Question: You have a candidate and a label. On the basis of the following heuristcs here:
-# 1. Strong programming skills in languages such as Python, PyTorch, and AWS/GCP are crucial for a machine learning engineer position at ElectroKare. A candidate with a strong background in programming will be able to develop and implement complex algorithms and models quickly and efficiently.
-# 2. Good communication skills are essential for this role, as the machine learning engineer will need to collaborate with cross-functional teams, explain technical concepts to non-technical stakeholders, and present findings to senior management. A candidate with excellent communication skills will be able to effectively convey their ideas and insights to various audiences.
-# 3. Experience in machine learning research, development, and critical thinking abilities are highly desirable for this position. A candidate with a strong background in machine learning will be able to design and implement innovative solutions that drive business growth and improve customer experiences.
-# 4. Knowledge of cloud computing platforms such as AWS or GCP is important for this role, as the machine learning engineer will need to deploy models on these platforms and manage large datasets in a scalable manner. A candidate with experience in cloud computing will be able to leverage the power of cloud technologies to accelerate the development process and improve model performance.
-# 5. The ability to work independently or as part of a team is crucial for success in this role, as the machine learning engineer may need to work on complex projects without direct supervision or collaborate with other engineers on large-scale initiatives. A candidate with strong independent work ethic or teamwork skills will be able to adapt quickly to new challenges and contribute meaningfully to the team's efforts."
-# decide whether the following candidate:
-
-# fits the category of machine learning engineer. When providing a reasoning, only reference the specific heuristics provided,
-# all your lines of reasoning should be relevant to the provided heuristic.
-
-# Answer:
-# In order to decide whether to accept or reject Joe, we need to assess their data with respect to the heuristics provided.
-
-# excel in this role must have done extensive research on the subject, demonstrating their expertise through their work experience and qualifications, and Joe does not quite have the relevant
-# qualifications. Based on that, I would reject him for the folr of machine learning engineer.
 
 
 class CotType(Enum):
@@ -159,10 +142,6 @@ class ChainOfThoughtPrompter(prompter.Prompter):
         self._client = client
         self._type = type
 
-    def __set_cot_examples(self, prompt: str):
-        """TODO A helper function to set the cot examples"""
-        return prompt
-
     def prompt(self, prompt: str) -> str:
         """
         The abstract method for a prompter to execute a prompt
@@ -172,6 +151,7 @@ class ChainOfThoughtPrompter(prompter.Prompter):
         if self._type == CotType.ZERO_SHOT:
             formatted_prompt += ZERO_SHOT_PROMPT
         elif self._type == CotType.FEW_SHOT_COT:
-            formatted_prompt += self.__set_cot_examples(prompt)
+            print("using few shot")
+            formatted_prompt += FEW_SHOT_PROMPT
 
         return self._client.query(formatted_prompt)

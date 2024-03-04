@@ -56,8 +56,8 @@ class DSPyPrompter(prompter.Prompter):
         config = dict(
             max_bootstrapped_demos=3,
             max_labeled_demos=3,
-            num_candidate_programs=10,
-            num_threads=4,
+            # num_candidate_programs=10,
+            # num_threads=4,
         )
 
         teleprompter = BootstrapFewShot(

@@ -14,3 +14,4 @@ fastapi
 uvicorn
 black
 nltk
+mistralai

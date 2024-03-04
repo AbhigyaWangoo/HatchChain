@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
-from llm.client import gpt, runpod
-from llm.prompt import few_shot, cot, dspy
+from llm.client import gpt, runpod, mistral as mclient
+from llm.prompt import few_shot, cot, dspy, cov
 
 PROMPT_CRAFTER = "prompt_crafter"
 DATASET = "data/dspy/dataset_10.json"
@@ -13,13 +13,14 @@ class AbstractClassifier(ABC):
         self._context_length = 4097
         self._openai_client = gpt.GPTClient()
         self._runpod_client = runpod.RunPodClient()
+        self._mistral_client = mclient.MistralLLMClient()
 
         if PROMPT_CRAFTER in kwargs:
             self._prompter = dspy.DSPyPrompter(
-                self._runpod_client, "dataset_10.json", kwargs[PROMPT_CRAFTER]
+                self._runpod_client, DATASET, kwargs[PROMPT_CRAFTER]
             )
         else:
-            self._prompter = cot.ChainOfThoughtPrompter(self._runpod_client)
+            self._prompter = cov.ChainOfVerification(self._mistral_client)
 
     @abstractmethod
     def classify(self, input: str) -> str:
