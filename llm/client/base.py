@@ -19,10 +19,12 @@ def get_navigation_string(heuristic: str, input_str: str, category: str) -> str:
         job requirements: {heuristic}
 
         Question: Out of the provided job description and resume, respond with 'accept' if 
-        the resume fullfills most of the requirements of the job description. Respond with 
-        'reject' if it does not. Provide a reasoning for your response. Make a decision based
-        upon the provided information, and if it is unclear, reject the candidate. If the 
-        resume is missing a few or more requirements, they should be rejected.
+        the resume fullfills over half of the requirements of the job description. Respond with 
+        'reject' if it does not. Provide a reasoning for your response. 
+
+        Make a decision based upon the provided information alone. If there are any substantial
+        gaps or missing portions of the resume related to the heuristic, the candidate should be 
+        rejected.
 
         Answer:
         """
