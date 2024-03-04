@@ -205,7 +205,6 @@ def create_classification_wrapper(job_id: int, resume_id: int):
     try:
         # 1. declare client
         client = postgres_client.PostgresClient(job_id)
-        # rt_client = rawtxt_client.ResumeDynamoClient(job_id)
 
         # 2. Try to read prev job_resume binding.
         # TODO add disk level caching for classification reasoning?
@@ -226,13 +225,7 @@ def create_classification_wrapper(job_id: int, resume_id: int):
             del candidate_metadata["email"]
             del candidate_metadata["phone"]
             del candidate_metadata["links"]
-            print(candidate_metadata)
-            # strdata = rt_client.get_resume(
-            #     str(resume_id), os.path.join(RESUMES_ROOT_DATAPATH, str(resume_id))
-            # )
-            strdata = json.dumps(
-                candidate_metadata
-            )  # Possible replace this with a more explainable reasoning
+            strdata = json.dumps(candidate_metadata)
 
             classifier = get_classifier(job_id, False)
             if isinstance(classifier, str):
