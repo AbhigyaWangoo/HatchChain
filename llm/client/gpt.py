@@ -11,7 +11,7 @@ class GPTClient(base.AbstractLLM):
         self._client = OpenAI()
 
     def query(
-        self, prompt: str, engine: str = "gpt-3.5-turbo-16k", temperature: int = 0.2
+        self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2
     ) -> str:
         """A simple wrapper to the gpt api"""
 

@@ -218,17 +218,16 @@ class ExplainableTreeClassifier(base.AbstractClassifier):
         else:
             verdict = ClassificationOutput.REJECT
 
-        print(win_map)
-        print(loss_map)
-
         merging_prompt = f"""
-            question: You are a recruiter, and are given the following set of reasonings for whether 
-            to reject or accept a candidate for a job:
-            {' '.join(list(win_map.values())) + '. ' + ' '.join(list(loss_map.values()))}
+            question: You are a recruiter, and are given the following reasonings 
+            to reject a candidate: {' '.join(list(win_map.values()))}
             
-            Given that this candidate should be {verdict.value}ed, perform the following operations:
-            1. Generate a grammatically perfect, concatenated version of all provided reasonings above. 
-            2. Clearly state that this candidate should be {verdict.value}ed
+            and the following reasonings to accpet a candidate: 
+            {' '.join(list(loss_map.values()))}
+            
+            Given that this candidate should be {verdict.value}ed, Generate a grammatically perfect, 
+            concatenated version of all provided reasonings above. Make sure to clearly state that 
+            this candidate should be {verdict.value}ed
 
             answer: {ZERO_SHOT_PROMPT}
         """
