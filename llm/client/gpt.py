@@ -10,9 +10,7 @@ class GPTClient(base.AbstractLLM):
 
         self._client = OpenAI()
 
-    def query(
-        self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2
-    ) -> str:
+    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2) -> str:
         """A simple wrapper to the gpt api"""
 
         response = self._client.chat.completions.create(

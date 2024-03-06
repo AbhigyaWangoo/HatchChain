@@ -13,6 +13,7 @@ if API_KEY is None:
     print("Please set the API_KEY env var in the .env file")
     exit(1)
 
+
 class ClaudeClient(base.AbstractLLM):
     """A client module to call the mistral API"""
 

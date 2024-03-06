@@ -5,10 +5,11 @@ import json
 import tqdm
 from time import sleep
 
-EXAMPLES="examples"
-PROMPT="prompt"
-EXAMPLE="example"
-MAX_RETRY=10
+EXAMPLES = "examples"
+PROMPT = "prompt"
+EXAMPLE = "example"
+MAX_RETRY = 10
+
 
 class DatasetGenerator:
     """
@@ -16,7 +17,11 @@ class DatasetGenerator:
     """
 
     def __init__(
-        self, output_dataset_filename: str, client: base.AbstractLLM, job_id: int, few_shot_examples_fname: str
+        self,
+        output_dataset_filename: str,
+        client: base.AbstractLLM,
+        job_id: int,
+        few_shot_examples_fname: str,
     ) -> None:
         super().__init__()
         self._output_dateset_fpath = output_dataset_filename
@@ -25,8 +30,8 @@ class DatasetGenerator:
         self._few_shot_examples_fname = few_shot_examples_fname
 
     def get_examples(self) -> str:
-        """ 
-        Gets examples from the few shot examples file path and return a 
+        """
+        Gets examples from the few shot examples file path and return a
         readable, concatenated string
         """
 
@@ -54,7 +59,9 @@ class DatasetGenerator:
         )  # TODO maybe make this read job function just return in some cases
 
         output_json = []
-        with open(self._output_dateset_fpath, "w", newline="", encoding="utf8") as csvfile:
+        with open(
+            self._output_dateset_fpath, "w", newline="", encoding="utf8"
+        ) as csvfile:
             examples = self.get_examples()
 
             for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
@@ -77,10 +84,12 @@ class DatasetGenerator:
                         break
                     except Exception as e:
 
-                        if i == MAX_RETRY-1:
+                        if i == MAX_RETRY - 1:
                             json.dump({"dataset": output_json}, csvfile)
                         else:
-                            print(f"Caught issue with llm client. Retrying resume...{e}")
+                            print(
+                                f"Caught issue with llm client. Retrying resume...{e}"
+                            )
                             sleep(2)
 
                 output_json.append({"resume": resume, "explanation": response})
