@@ -33,7 +33,7 @@ class DatasetGenerator:
             examples = few_shot_examples[EXAMPLES]
 
             final_prompt = ""
-            for example in tqdm.tqdm(examples, desc="Creating dataset with llm client"):
+            for example in examples:
                 final_prompt += f"""
                     question: {example["prompt"]}
 
@@ -51,12 +51,11 @@ class DatasetGenerator:
             "/dev/null"
         )  # TODO maybe make this read job function just return in some cases
 
+        output_json = []
         with open(self._output_dateset_fpath, "w", newline="", encoding="utf8") as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(["Resume", "Explanation"])
             examples = self.get_examples()
 
-            for resume in resumes:
+            for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
                 prompt = f"""
                     Given this resume: {resume}
 
@@ -70,4 +69,6 @@ class DatasetGenerator:
                 """
 
                 response = self._client.query(prompt)
-                csv_writer.writerow([resume, response])
+                output_json.append({"resume": resume, "explanation": response})
+
+            json.dump({"dataset": output_json}, csvfile)
