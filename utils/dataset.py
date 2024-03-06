@@ -3,10 +3,12 @@ from query_engine.src.db import postgres_client
 import csv
 import json
 import tqdm
+from time import sleep
 
 EXAMPLES="examples"
 PROMPT="prompt"
 EXAMPLE="example"
+MAX_RETRY=10
 
 class DatasetGenerator:
     """
@@ -68,7 +70,19 @@ class DatasetGenerator:
                     For example: {examples}
                 """
 
-                response = self._client.query(prompt)
+                response = "Response generation did not work"
+                for i in range(MAX_RETRY):
+                    try:
+                        response = self._client.query(prompt)
+                        break
+                    except Exception as e:
+
+                        if i == MAX_RETRY-1:
+                            json.dump({"dataset": output_json}, csvfile)
+                        else:
+                            print(f"Caught issue with llm client. Retrying resume...{e}")
+                            sleep(2)
+
                 output_json.append({"resume": resume, "explanation": response})
 
             json.dump({"dataset": output_json}, csvfile)
