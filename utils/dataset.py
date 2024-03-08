@@ -49,6 +49,12 @@ class DatasetGenerator:
 
             return final_prompt
 
+    def generate_prompt(self, job: str, resume: str, examples: str, max_length: int=4096) -> str:
+        """ Generates a prompt with the provided job and resume """
+
+        if len(job) + len(examples) + len(resume) > max_length:
+            
+
     def generate_dataset(self):
         """Generates a dataset in the output dataset filepath"""
 

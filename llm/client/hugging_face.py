@@ -1,15 +1,35 @@
-from huggingface_hub import get_inference_endpoint, InferenceEndpoint
+import requests
 from . import base
 import os
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
 ZEPHYR_ENDPOINT_NAME = "zephyr-7b-beta-kas"
 ZEPHYR_QNA_ENDPOINT_NAME = "zephyr-7b-qna-uht"
 MISTRAL_ENDPOINT_NAME = "mixtral-8x7b-instruct-v0-1-tgo"
+LLAMA2_ENDPOINT_NAME = (
+    "https://sffoi5rv3j9b8ga7.us-east-1.aws.endpoints.huggingface.cloud"
+)
 
 HUGGING_FACE_TOKEN = os.environ.get("HUGGING_FACE_TOKEN")
+
+HEADERS = {
+    "Accept": "application/json",
+    "Authorization": f"Bearer {HUGGING_FACE_TOKEN}",
+    "Content-Type": "application/json",
+}
+
+
+def query(payload):
+    """
+    A simple helper function to send a hugging face response
+    """
+    response = requests.post(
+        LLAMA2_ENDPOINT_NAME, headers=HEADERS, json=payload, timeout=100
+    )
+    return response.json()
 
 
 class HuggingFaceClient(base.AbstractLLM):
@@ -17,31 +37,36 @@ class HuggingFaceClient(base.AbstractLLM):
     A client module to call the Hugging Face API. Currently just have zephyr-7b-beta deployed.
     """
 
-    def __init__(self, inference_endpoint: str = MISTRAL_ENDPOINT_NAME) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        self.inference_client = self.get_endpoint(inference_endpoint)
-
-    def get_endpoint(self, inference_endpoint: str) -> InferenceEndpoint:
+    def recursive_summarizer(
+        self, prompt: str, target_length: int, n_chunks: int = 10
+    ) -> str:
         """
-        Retrieves inference endpoint, no matter it's state.
-
-        inference_endpoint: The endpoint to retrieve a client for
+        Trim the provided prompt in summary chunks until it
+        reaches the specified length or less.
         """
+        prompt = re.sub(" +", " ", prompt)
+        final_res = ""
 
-        if HUGGING_FACE_TOKEN is None:
-            raise ValueError("HUGGING_FACE_TOKEN env var is not set in .env file.")
+        # target_length = n_chunks * chunk_size
+        chunk_size = target_length // n_chunks
 
-        endpoint = get_inference_endpoint(inference_endpoint, token=HUGGING_FACE_TOKEN)
+        for chunk in range(n_chunks):
+            # Problem is there are way too many tokens in the input. chop them up into smaller pieces.
+            trim_section = prompt[chunk * chunk_size : (chunk + 1) * chunk_size]
+            output = query(
+                {
+                    "inputs": f"<s>[INST] <<SYS>> You are a helpful recruitment assistant. Properly exaplain your reasonings. </s><s>[INST] Summarize the following information into {chunk_size} chracters or less: {trim_section} [/INST]",
+                    "parameters": {"max_new_tokens": chunk_size},
+                }
+            )
+            final_res += output[0]["generated_text"]
 
-        try:
-            endpoint.resume()
-        except Exception:
-            pass
+        return final_res
 
-        return endpoint.wait()
-
-    def query(self, prompt: str, one_off: bool = True) -> str:
+    def query(self, prompt: str, context_length: int = 4096) -> str:
         """
         A simple wrapper to the huggingface api
 
@@ -49,9 +74,27 @@ class HuggingFaceClient(base.AbstractLLM):
         after prompt. For testing here and there.
         """
 
-        output = self.inference_client.client.text_generation(prompt)
+        for _ in range(10):
+            try:
+                base_prompt = f"<s>[INST] <<SYS>> You are a helpful recruitment assistant. Properly exaplain your reasonings. </s><s>[INST] {prompt} [/INST]"
 
-        if one_off:
-            self.inference_client.pause()
+                if len(base_prompt) > context_length:
+                    base_prompt = self.recursive_summarizer(
+                        base_prompt, context_length, 10
+                    )
 
-        return output
+                print(len(base_prompt))
+
+                output = query(
+                    {  # Problem is there are way too many tokens in the input. chop them up into smaller pieces.
+                        "inputs": base_prompt,
+                        "parameters": {"max_new_tokens": 400},
+                    }
+                )
+                if "error" not in output:
+                    return output[0]["generated_text"]
+            except Exception as e:
+                print("Exception in hugging face querier")
+                print(e)
+
+        return output[0]["generated_text"]
