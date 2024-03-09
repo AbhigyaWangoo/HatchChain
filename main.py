@@ -25,25 +25,22 @@ def gen_dataset(name: str):
     )
     generator.generate_dataset()
 
+def multiproc_runall():
+    """ Runs all dataset generations based upon the provided clients """
+    multiprocessing.set_start_method('spawn')
+
+    procs=[]
+    # Spawn subprocesses
+    for key, _ in CLIENTS.items():
+        name = key
+
+        process = multiprocessing.Process(target=gen_dataset, args=(f"frontend-{name}", ))
+        procs.append(process)
+        process.start()
+
+    # Wait for all processes to complete
+    for process in procs:
+        process.join()
 
 if __name__ == "__main__":
-    # multiprocessing.set_start_method('spawn')
-
-    # procs=[]
-    # # Spawn subprocesses
-    # for key, _ in CLIENTS.items():
-    #     name = key
-
-    #     process = multiprocessing.Process(target=gen_dataset, args=(f"frontend-{name}", ))
-    #     procs.append(process)
-    #     process.start()
-
-    # # Wait for all processes to complete
-    # for process in procs:
-    #     process.join()
-    # client = HuggingFaceClient()
-    # generator = DatasetGenerator(
-    # "backend-results/rankings-llama2.json", client, 188, "data/fewshotexamples.json"
-    # )
-    # generator.generate_dataset()
     gen_dataset("pm-llama2")
