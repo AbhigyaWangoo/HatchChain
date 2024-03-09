@@ -3,6 +3,8 @@ from query_engine.src.db import postgres_client
 import json
 import tqdm
 from time import sleep
+import os
+from typing import List, Any
 
 EXAMPLES = "examples"
 PROMPT = "prompt"
@@ -65,6 +67,26 @@ class DatasetGenerator:
             For example: {examples}
         """
 
+    def append_to_file(self, fname: str, new_entries: List[Any]):
+        """ Appends entries to an existing JSON file """
+
+        if not os.path.exists(fname):
+            open(fname, "w", encoding="utf8").close() # create if dne
+
+        with open(fname, "r+", encoding="utf8") as fp:
+
+            dataset = {}
+            if os.path.getsize(fname) > 0:
+                # If file is not empty.
+                dataset = json.load(fp)
+                dataset["dataset"] += new_entries
+            else:
+                dataset["dataset"] = new_entries
+
+            fp.seek(0)
+
+            json.dump(dataset, fp)
+
     def generate_dataset(self):
         """Generates a dataset in the output dataset filepath"""
 
@@ -74,30 +96,21 @@ class DatasetGenerator:
             "/dev/null"
         )  # TODO maybe make this read job function just return in some cases
 
-        output_json = []
-        with open(
-            self._output_dateset_fpath, "w", newline="", encoding="utf8"
-        ) as csvfile:
-            examples = self.get_examples()
+        examples = self.get_examples()
+        for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
+            prompt = self.generate_prompt(job, resume, examples)
 
-            for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
-                prompt = self.generate_prompt(job, resume, examples)
-
-                response = "Response generation did not work"
-                for i in range(MAX_RETRY):
-                    try:
-                        response = self._client.query(prompt)
-                        break
-                    except Exception as e:
-
-                        if i == MAX_RETRY - 1:
-                            json.dump({"dataset": output_json}, csvfile)
-                        else:
-                            print(
-                                f"Caught issue with llm client. Retrying resume...{e}"
-                            )
-                            sleep(2)
-
-                output_json.append({"resume": resume, "explanation": response})
-
-            json.dump({"dataset": output_json}, csvfile)
+            response = "Response generation did not work"
+            for i in range(MAX_RETRY):
+                try:
+                    response = self._client.query(prompt)
+                    self.append_to_file(self._output_dateset_fpath, [response])
+                    break
+                except Exception as e:
+                    if i == MAX_RETRY - 1:
+                        print(f"Resume {resume[0]} couldn't be processed, moving on to next one")
+                    else:
+                        print(
+                            f"Caught issue with llm client. Retrying resume...{e}"
+                        )
+                        sleep(1)
