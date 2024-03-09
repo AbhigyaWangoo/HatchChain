@@ -19,7 +19,6 @@ def gen_dataset(name: str):
     """Worker function to help generate dataset"""
     client_name = name.split("-")[-1]
     client = CLIENTS[client_name]
-    print(client)
 
     generator = DatasetGenerator(
         f"rankings-{name}.json", client, 135, "data/fewshotexamples.json"
@@ -42,8 +41,9 @@ if __name__ == "__main__":
     # # Wait for all processes to complete
     # for process in procs:
     #     process.join()
-    client = HuggingFaceClient()
-    generator = DatasetGenerator(
-        "backend-results/rankings-llama2.json", client, 188, "data/fewshotexamples.json"
-    )
-    generator.generate_dataset()
+    # client = HuggingFaceClient()
+    # generator = DatasetGenerator(
+        # "backend-results/rankings-llama2.json", client, 188, "data/fewshotexamples.json"
+    # )
+    # generator.generate_dataset()
+    gen_dataset("pm-llama2")

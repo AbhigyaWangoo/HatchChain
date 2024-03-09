@@ -51,16 +51,6 @@ class DatasetGenerator:
     def generate_prompt(self, job: str, resume: str, examples: str, max_length: int=4096) -> str:
         """ Generates a prompt with the provided job and resume """
 
-        def summarizer(new_size: int, chunk: str) -> str:
-            prompt=f"Summarize the following information into {new_size} characters or less: {chunk}"
-
-            return self._client.query(prompt)
-
-        while len(job) + len(examples) + len(resume) > max_length:
-            job=summarizer(int(len(job) * .2), job)
-            resume=summarizer(int(len(resume) * .2), resume)
-            examples=summarizer(int(len(examples) * .2), examples)
-
         return f"""
             Given this resume: {resume}
 
