@@ -1,6 +1,5 @@
 from llm.client import base
 from query_engine.src.db import postgres_client
-import csv
 import json
 import tqdm
 from time import sleep
@@ -52,8 +51,27 @@ class DatasetGenerator:
     def generate_prompt(self, job: str, resume: str, examples: str, max_length: int=4096) -> str:
         """ Generates a prompt with the provided job and resume """
 
-        if len(job) + len(examples) + len(resume) > max_length:
-            
+        def summarizer(new_size: int, chunk: str) -> str:
+            prompt=f"Summarize the following information into {new_size} characters or less: {chunk}"
+
+            return self._client.query(prompt)
+
+        while len(job) + len(examples) + len(resume) > max_length:
+            job=summarizer(int(len(job) * .2), job)
+            resume=summarizer(int(len(resume) * .2), resume)
+            examples=summarizer(int(len(examples) * .2), examples)
+
+        return f"""
+            Given this resume: {resume}
+
+            and this job description: {job}
+
+            Would accept or reject the candidate for the provided
+            job? Why or why not? If you are uncertain, you must decide
+            whether to accept or reject based on the information you are provided.
+
+            For example: {examples}
+        """
 
     def generate_dataset(self):
         """Generates a dataset in the output dataset filepath"""
@@ -71,17 +89,7 @@ class DatasetGenerator:
             examples = self.get_examples()
 
             for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
-                prompt = f"""
-                    Given this resume: {resume}
-
-                    and this job description: {job}
-
-                    Would accept or reject the candidate for the provided
-                    job? Why or why not? If you are uncertain, you must decide
-                    whether to accept or reject based on the information you are provided.
-
-                    For example: {examples}
-                """
+                prompt = self.generate_prompt(job, resume, examples)
 
                 response = "Response generation did not work"
                 for i in range(MAX_RETRY):
