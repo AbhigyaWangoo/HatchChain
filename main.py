@@ -43,7 +43,7 @@ if __name__ == "__main__":
     #     process.join()
     # client = HuggingFaceClient()
     # generator = DatasetGenerator(
-        # "backend-results/rankings-llama2.json", client, 188, "data/fewshotexamples.json"
+    # "backend-results/rankings-llama2.json", client, 188, "data/fewshotexamples.json"
     # )
     # generator.generate_dataset()
     gen_dataset("pm-llama2")

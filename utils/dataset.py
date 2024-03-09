@@ -48,8 +48,10 @@ class DatasetGenerator:
 
             return final_prompt
 
-    def generate_prompt(self, job: str, resume: str, examples: str, max_length: int=4096) -> str:
-        """ Generates a prompt with the provided job and resume """
+    def generate_prompt(
+        self, job: str, resume: str, examples: str, max_length: int = 4096
+    ) -> str:
+        """Generates a prompt with the provided job and resume"""
 
         return f"""
             Given this resume: {resume}
