@@ -58,7 +58,7 @@ class HuggingFaceClient(base.AbstractLLM):
             trim_section = prompt[chunk * chunk_size : (chunk + 1) * chunk_size]
             output = query(
                 {
-                    "inputs": f"<s>[INST] <<SYS>> You are a helpful recruitment assistant. Properly exaplain your reasonings. </s><s>[INST] Summarize the following information into {chunk_size} chracters or less: {trim_section} [/INST]",
+                    "inputs": f"<s>[INST] <<SYS>> You are a summarizer. Properly abide by the summary limit. </s><s>[INST] Summarize the following information into EXACTLY {chunk_size} chracters or less: {trim_section} [/INST]",
                     "parameters": {"max_new_tokens": chunk_size},
                 }
             )
@@ -66,7 +66,7 @@ class HuggingFaceClient(base.AbstractLLM):
 
         return final_res
 
-    def query(self, prompt: str, context_length: int = 4096) -> str:
+    def query(self, prompt: str, context_length: int = 4000) -> str:
         """
         A simple wrapper to the huggingface api
 
@@ -93,6 +93,8 @@ class HuggingFaceClient(base.AbstractLLM):
                 )
                 if "error" not in output:
                     return output[0]["generated_text"]
+                else:
+                    print(output)
             except Exception as e:
                 print("Exception in hugging face querier")
                 print(e)
