@@ -24,7 +24,7 @@ class ChainOfVerification(base.Prompter):
     def __init__(
         self,
         client: llm.AbstractLLM,
-        execution_type: VerificationType = VerificationType.JOINT,
+        execution_type: VerificationType = VerificationType.TWO_STEP,
     ) -> None:
         super().__init__(client)
         self._execution_type = execution_type
