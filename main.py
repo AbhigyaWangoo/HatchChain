@@ -15,26 +15,29 @@ CLIENTS = {
 }
 
 
-def gen_dataset(name: str):
+def gen_dataset(name: str, job_id: int):
     """Worker function to help generate dataset"""
     client_name = name.split("-")[-1]
     client = CLIENTS[client_name]
 
     generator = DatasetGenerator(
-        f"rankings-{name}.json", client, 135, "data/fewshotexamples.json"
+        f"rankings-{name}.json", client, job_id, "data/fewshot_summarized.json"
     )
     generator.generate_dataset()
 
-def multiproc_runall():
-    """ Runs all dataset generations based upon the provided clients """
-    multiprocessing.set_start_method('spawn')
 
-    procs=[]
+def multiproc_runall():
+    """Runs all dataset generations based upon the provided clients"""
+    multiprocessing.set_start_method("spawn")
+
+    procs = []
     # Spawn subprocesses
     for key, _ in CLIENTS.items():
         name = key
 
-        process = multiprocessing.Process(target=gen_dataset, args=(f"frontend-{name}", ))
+        process = multiprocessing.Process(
+            target=gen_dataset, args=(f"frontend-{name}",)
+        )
         procs.append(process)
         process.start()
 
@@ -42,5 +45,6 @@ def multiproc_runall():
     for process in procs:
         process.join()
 
+
 if __name__ == "__main__":
-    gen_dataset("pm-llama2")
+    gen_dataset("ml-llama2", 148)
