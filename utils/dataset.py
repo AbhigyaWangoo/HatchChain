@@ -57,22 +57,15 @@ class DatasetGenerator:
     ) -> str:
         """Generates a prompt with the provided job and resume"""
 
-        print(f"Job length: {len(job)}")
-        print(f"resume length: {len(resume)}")
-        print(f"examples length: {len(examples)}")
-
         new_job = self._mistral_summarizor.query(
             f"Summarize the following job into 5 sentences. Preserve key information, and do not change any narrative: {job}"
         )
-        print(new_job)
 
         total_length = len(new_job) + len(resume) + len(examples)
         if total_length > max_length:
             resume = self._mistral_summarizor.query(
                 f"Summarize the following resume into 5 sentences. Preserve key information, and do not change any narrative: {resume}"
             )
-
-        print(f"New total length: {len(resume) + len(new_job) + len(examples)}")
 
         return f"""
             Given this resume: {resume}
@@ -103,6 +96,7 @@ class DatasetGenerator:
                 dataset["dataset"] = new_entries
 
             fp.seek(0)
+            fp.truncate(0)
 
             json.dump(dataset, fp)
 
@@ -151,7 +145,6 @@ class DatasetGenerator:
         job = self._clean_job(job)
 
         examples = self.get_examples()
-        tracker = set()
         for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
             resume_str = self._clean_resume(resume)
             prompt = self.generate_prompt(job, resume_str, str(examples))
@@ -162,12 +155,8 @@ class DatasetGenerator:
                     response = self._client.query(prompt)
                     if len(response) < 10:
                         print("TOKEN LIMIT EXCEEDED")
-                        print(list(tracker))
                         exit(1)
 
-                    tracker.add(
-                        resume[0]
-                    )  # Adding resume to tracked so we don't overlap on next run.
                     self.append_to_file(
                         self._output_dateset_fpath,
                         [{"resume": resume, "explanation": response}],
