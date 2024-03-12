@@ -1,5 +1,13 @@
 from openai import OpenAI
 from . import base
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY")
+if OPENAI_API_KEY is None:
+    print("Please pass in OPENAI_API_KEY in the .env file")
+    exit(1)
 
 
 class GPTClient(base.AbstractLLM):
@@ -8,7 +16,7 @@ class GPTClient(base.AbstractLLM):
     def __init__(self) -> None:
         super().__init__()
 
-        self._client = OpenAI()
+        self._client = OpenAI(api_key=OPENAI_API_KEY)
 
     def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2) -> str:
         """A simple wrapper to the gpt api"""
