@@ -145,7 +145,20 @@ class DatasetGenerator:
         job = self._clean_job(job)
 
         examples = self.get_examples()
+        found = set()
+        with open(self._output_dateset_fpath, "r", encoding="utf8") as fp:
+            try:
+                dataset = json.load(fp)
+                for resume in dataset["dataset"]:
+                    found.add(resume["resume"][0])
+            except Exception as e:
+                print(f"Error in reading dataset {e}")
+
+        print(len(found))
         for resume in tqdm.tqdm(resumes, desc="Generating dataset of resumes"):
+            if resume[0] in found:
+                continue
+
             resume_str = self._clean_resume(resume)
             prompt = self.generate_prompt(job, resume_str, str(examples))
 
