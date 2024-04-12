@@ -22,7 +22,7 @@ class ClaudeClient(base.AbstractLLM):
         self._client = anthropic.Client(api_key=API_KEY)
 
     def query(self, prompt: str, model: str = MODEL, temperature: int = 0.2) -> str:
-        """A simple wrapper to the mistral api"""
+        """A simple wrapper to the claude api"""
 
         response = self._client.messages.create(
             model=model,

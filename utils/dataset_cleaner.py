@@ -3,8 +3,36 @@ import json
 import csv
 from query_engine.src.db import postgres_client
 import tqdm
+from pandas import pd
 
 DIRSRC="reports"
+
+RELEVANCY_COL_0="Relevancy: For each component of the job description, did the reasoning mention or reference it? Tally the total number of references."
+RELEVANCY_COL_1="Relevancy: Did the reasoning mention an information that was incorrect from the job description? Tally the total number of references."
+RELEVANCY_COL_2="Relevancy: Were there a relevant reference to that candidate’s resume? Tally the total number of references."
+RELEVANCY_COL_3="Relevancy: Did the reasoning mention an information that was incorrect from the resume? Tally the total number of references."
+
+def clean_classifier_results(eval_csv: str):
+    """
+    Reads the evaluations from a csv file, and does the following:
+
+    1. Converts all qualitative results into quantitative results
+    2. Writes all of them to a new file
+
+    """
+    conversions = {
+        "No Evidence": 0,
+        "No Clear Evidence": 1,
+        "Not meet to requirement": 1,
+        "There are no clear examples": 1
+    }
+
+    df=pd.read_csv(eval_csv)
+    unclean_columns=[RELEVANCY_COL_0, RELEVANCY_COL_1, RELEVANCY_COL_2, RELEVANCY_COL_3]
+    
+    for col in unclean_columns:
+        col=df[col]
+        # TODO implement the rest of this cleaner
 
 def process_directory(directory_path):
     # Iterate through each file in the directory and its subdirectories
