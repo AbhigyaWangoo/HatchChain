@@ -1,4 +1,5 @@
 from openai import OpenAI
+import json
 from . import base
 from dotenv import load_dotenv
 import os
@@ -18,7 +19,7 @@ class GPTClient(base.AbstractLLM):
 
         self._client = OpenAI(api_key=OPENAI_API_KEY)
 
-    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2, sys_prompt: str=None) -> str:
+    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.1, sys_prompt: str=None, is_json: bool=False) -> str:
         """A simple wrapper to the gpt api"""
 
         messages=[
@@ -34,12 +35,21 @@ class GPTClient(base.AbstractLLM):
                 "content": sys_prompt,
             })
 
-        response = self._client.chat.completions.create(
-            messages=messages,
-            model=engine,
-            temperature=temperature,
-        )
+        client_kwargs = {
+            "messages": messages,
+            "model": engine,
+            "temperature": temperature,
+        }
+
+        if is_json:
+            client_kwargs["response_format"] = {"type": "json_object"}
+            client_kwargs["model"]="gpt-4-1106-preview"
+
+        response = self._client.chat.completions.create(**client_kwargs)
 
         generated_response = response.choices[0].message.content.strip()
+
+        if is_json:
+            return json.loads(generated_response)
 
         return generated_response

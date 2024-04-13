@@ -14,8 +14,9 @@ RELEVANCY_COL_2="Relevancy: Were there a relevant reference to that candidate’
 RELEVANCY_COL_3="Relevancy: Did the reasoning mention an information that was incorrect from the resume? Tally the total number of references."
 
 EVALS_FILE="data/evals/eval_responses.csv"
+NUMERICAL_SYSPROMPT="utils/sysprompts/numerical_prompt.txt"
 
-def clean_classifier_results(eval_csv: str=EVALS_FILE):
+def clean_classifier_results(eval_csv: str=EVALS_FILE, ofile: str="output.json"):
     """
     Reads the evaluations from a csv file, and does the following:
 
@@ -35,32 +36,25 @@ def clean_classifier_results(eval_csv: str=EVALS_FILE):
     for column in unclean_columns:
         unique_set.update(df[column].unique())
 
+    unique_set.remove('o')
     unclean_to_clean = {
         'o':0
     }
 
+    sysprompt=None
+    with open(NUMERICAL_SYSPROMPT, "r", encoding="utf8") as fp:
+        sysprompt = fp.read()
+
     client = gpt.GPTClient()
     for val in unique_set:
+
         if not val.isnumeric():
-            prompt = """
-            You are a recruiter evaluating another international recruiter's ratings on a certain candidate's resume. You need to take in the provided qualitative rating,
-            and assign it a quantitative value. I have attached a few examples below. Make sure your ratings are on a scale of 1 - 5, do not exceed or go below this range.
 
-            Q: no clear indications
-            A: 1
-            
-            Q: There are no clear examples
-            A: 1
-            
-            Q: yes Relevant
-            A: 4
-            
-            Q: Evidence Found
-            A: 3
-            """
+            res = client.query(val, sys_prompt=sysprompt, is_json=True)
+            unclean_to_clean[val] = res["rating"]
 
-            res = client.query(val, sys_prompt=prompt)
-            unclean_to_clean[val] = res
+    with open(ofile, "w", encoding="utf8") as fp:
+        json.dump(unclean_to_clean, fp)
 
     print(unclean_to_clean)
 
