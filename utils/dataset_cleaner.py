@@ -2,9 +2,61 @@ import os
 import json
 import csv
 from query_engine.src.db import postgres_client
+from llm.client import gpt
 import tqdm
+import pandas as pd
 
 DIRSRC="reports"
+
+RELEVANCY_COL_0="Relevancy: For each component of the job description, did the reasoning mention or reference it? Tally the total number of references."
+RELEVANCY_COL_1="Relevancy: Did the reasoning mention an information that was incorrect from the job description? Tally the total number of references."
+RELEVANCY_COL_2="Relevancy: Were there a relevant reference to that candidate’s resume? Tally the total number of references."
+RELEVANCY_COL_3="Relevancy: Did the reasoning mention an information that was incorrect from the resume? Tally the total number of references."
+
+EVALS_FILE="data/evals/eval_responses.csv"
+NUMERICAL_SYSPROMPT="utils/sysprompts/numerical_prompt.txt"
+
+def clean_classifier_results(eval_csv: str=EVALS_FILE, ofile: str="output.json"):
+    """
+    Reads the evaluations from a csv file, and does the following:
+
+    1. Converts all qualitative results into quantitative results
+    2. Writes all of them to a new file
+
+    """
+
+    if not os.path.exists(eval_csv):
+        print("Eval file does not exist. Exiting...")
+        return
+
+    df=pd.read_csv(eval_csv)
+    unclean_columns=[RELEVANCY_COL_0, RELEVANCY_COL_1, RELEVANCY_COL_2, RELEVANCY_COL_3]
+
+    unique_set = set()
+    for column in unclean_columns:
+        unique_set.update(df[column].unique())
+
+    unique_set.remove('o')
+    unclean_to_clean = {
+        'o':0
+    }
+
+    sysprompt=None
+    with open(NUMERICAL_SYSPROMPT, "r", encoding="utf8") as fp:
+        sysprompt = fp.read()
+
+    client = gpt.GPTClient()
+    for val in unique_set:
+
+        if not val.isnumeric():
+
+            res = client.query(val, sys_prompt=sysprompt, is_json=True)
+            unclean_to_clean[val] = res["rating"]
+
+    with open(ofile, "w", encoding="utf8") as fp:
+        json.dump(unclean_to_clean, fp)
+
+    print(unclean_to_clean)
 
 def process_directory(directory_path):
     # Iterate through each file in the directory and its subdirectories

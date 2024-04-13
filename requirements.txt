@@ -16,3 +16,4 @@ black
 nltk
 mistralai
 anthropic
+matplotlib
