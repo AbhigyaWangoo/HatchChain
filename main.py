@@ -5,6 +5,8 @@ from llm.client.mistral import MistralLLMClient
 from llm.client.claude import ClaudeClient
 from llm.client.hugging_face import HuggingFaceClient
 
+from utils.graph import MetricGrapher
+
 import multiprocessing
 
 CLIENTS = {
@@ -47,4 +49,5 @@ def multiproc_runall():
 
 
 if __name__ == "__main__":
-    gen_dataset("ml-llama2", 148)
+    grapher = MetricGrapher("data/evals/clean_evals.csv")
+    grapher.generate_relevancy_score_graph()
