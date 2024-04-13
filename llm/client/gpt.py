@@ -18,16 +18,24 @@ class GPTClient(base.AbstractLLM):
 
         self._client = OpenAI(api_key=OPENAI_API_KEY)
 
-    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2) -> str:
+    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.2, sys_prompt: str=None) -> str:
         """A simple wrapper to the gpt api"""
 
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ]
+
+        if sys_prompt is not None:
+            messages.append({
+                "role": "system",
+                "content": sys_prompt,
+            })
+
         response = self._client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
+            messages=messages,
             model=engine,
             temperature=temperature,
         )

@@ -2,8 +2,9 @@ import os
 import json
 import csv
 from query_engine.src.db import postgres_client
+from llm.client import gpt
 import tqdm
-from pandas import pd
+import pandas as pd
 
 DIRSRC="reports"
 
@@ -12,7 +13,9 @@ RELEVANCY_COL_1="Relevancy: Did the reasoning mention an information that was in
 RELEVANCY_COL_2="Relevancy: Were there a relevant reference to that candidate’s resume? Tally the total number of references."
 RELEVANCY_COL_3="Relevancy: Did the reasoning mention an information that was incorrect from the resume? Tally the total number of references."
 
-def clean_classifier_results(eval_csv: str):
+EVALS_FILE="data/evals/eval_responses.csv"
+
+def clean_classifier_results(eval_csv: str=EVALS_FILE):
     """
     Reads the evaluations from a csv file, and does the following:
 
@@ -20,19 +23,46 @@ def clean_classifier_results(eval_csv: str):
     2. Writes all of them to a new file
 
     """
-    conversions = {
-        "No Evidence": 0,
-        "No Clear Evidence": 1,
-        "Not meet to requirement": 1,
-        "There are no clear examples": 1
-    }
+
+    if not os.path.exists(eval_csv):
+        print("Eval file does not exist. Exiting...")
+        return
 
     df=pd.read_csv(eval_csv)
     unclean_columns=[RELEVANCY_COL_0, RELEVANCY_COL_1, RELEVANCY_COL_2, RELEVANCY_COL_3]
-    
-    for col in unclean_columns:
-        col=df[col]
-        # TODO implement the rest of this cleaner
+
+    unique_set = set()
+    for column in unclean_columns:
+        unique_set.update(df[column].unique())
+
+    unclean_to_clean = {
+        'o':0
+    }
+
+    client = gpt.GPTClient()
+    for val in unique_set:
+        if not val.isnumeric():
+            prompt = """
+            You are a recruiter evaluating another international recruiter's ratings on a certain candidate's resume. You need to take in the provided qualitative rating,
+            and assign it a quantitative value. I have attached a few examples below. Make sure your ratings are on a scale of 1 - 5, do not exceed or go below this range.
+
+            Q: no clear indications
+            A: 1
+            
+            Q: There are no clear examples
+            A: 1
+            
+            Q: yes Relevant
+            A: 4
+            
+            Q: Evidence Found
+            A: 3
+            """
+
+            res = client.query(val, sys_prompt=prompt)
+            unclean_to_clean[val] = res
+
+    print(unclean_to_clean)
 
 def process_directory(directory_path):
     # Iterate through each file in the directory and its subdirectories
