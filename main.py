@@ -50,4 +50,4 @@ def multiproc_runall():
 
 if __name__ == "__main__":
     grapher = MetricGrapher("data/evals/clean_evals.csv")
-    grapher.generate_relevancy_score_graph()
+    grapher.generate_all_graphs()

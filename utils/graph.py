@@ -1,9 +1,10 @@
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
+import os
 import numpy as np
 
-
+DATA_DIR="data/"
 GRAPHS_DIR="graphs/"
 
 RELEVANCY_MATCH=r"Relevancy*"
@@ -14,14 +15,28 @@ class MetricGrapher():
         self.source_file=source_file
         self.df = pd.read_csv(source_file)
 
-    def generate_relevancy_score_graph(self, pattern_str: str=RELEVANCY_MATCH, graph_name: str="graph.png"):
-        """Generates a graph of the relevancy scores"""
+    def generate_all_graphs(self):
+        """Generates all individual graphs for evals"""
 
-        pattern = re.compile(pattern_str)
+        patterns = {
+            "Hallucination.png": r'Relevancy: (resume|job description) hallucination',
+            "Grammar.png": r"Grammar and Readability:.*",
+            "Accuracy.png": r"Accuracy of explanation:.*"
+        }
+
+        for  graph_name, pattern in patterns.items():
+            self.generate_score_graph(pattern, graph_name)
+
+    def generate_score_graph(self, pattern_str: str=RELEVANCY_MATCH, graph_name: str="graph.png"):
+        """Generates a graph of the regex matched scores"""
+
+        pattern = re.compile(pattern_str, re.IGNORECASE)
 
         key_column="recruiter"
         relevant_columns = [column for column in self.df.columns if pattern.match(column)]
-        numeric_columns = self.df.select_dtypes(include='number').columns
+        relevant_df = self.df[relevant_columns]
+
+        numeric_columns = relevant_df.select_dtypes(include='number').columns
         relevant_numeric_columns = [col for col in relevant_columns if col in numeric_columns]
 
         grouped_data_mean = self.df.groupby(key_column)[relevant_numeric_columns].mean()
@@ -42,9 +57,11 @@ class MetricGrapher():
             # Plot bars for mean relevancy scores
             plt.bar(x_pos_adjusted, grouped_data_mean[column], width=bar_width, yerr=grouped_data_std[column], label=column)
 
+        title=graph_name.split(".")[0]
         plt.xlabel(key_column)
         plt.ylabel('Mean Relevancy Score')
-        plt.title('Relevancy Scores by Recruiter')
+        plt.title(f'{title} Scores by Recruiter')
         plt.xticks(x_positions, grouped_data_mean.index)
         plt.legend()
-        plt.savefig(graph_name)
+        output_path=os.path.join(os.path.join(DATA_DIR, GRAPHS_DIR), graph_name)
+        plt.savefig(output_path)
