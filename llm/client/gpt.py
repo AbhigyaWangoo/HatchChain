@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if OPENAI_API_KEY is None:
     print("Please pass in OPENAI_API_KEY in the .env file")
     exit(1)
@@ -19,10 +19,17 @@ class GPTClient(base.AbstractLLM):
 
         self._client = OpenAI(api_key=OPENAI_API_KEY)
 
-    def query(self, prompt: str, engine: str = "gpt-4", temperature: int = 0.1, sys_prompt: str=None, is_json: bool=False) -> str:
+    def query(
+        self,
+        prompt: str,
+        engine: str = "gpt-4",
+        temperature: int = 0.1,
+        sys_prompt: str = None,
+        is_json: bool = False,
+    ) -> str:
         """A simple wrapper to the gpt api"""
 
-        messages=[
+        messages = [
             {
                 "role": "user",
                 "content": prompt,
@@ -30,10 +37,12 @@ class GPTClient(base.AbstractLLM):
         ]
 
         if sys_prompt is not None:
-            messages.append({
-                "role": "system",
-                "content": sys_prompt,
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": sys_prompt,
+                }
+            )
 
         client_kwargs = {
             "messages": messages,
@@ -43,7 +52,7 @@ class GPTClient(base.AbstractLLM):
 
         if is_json:
             client_kwargs["response_format"] = {"type": "json_object"}
-            client_kwargs["model"]="gpt-4-1106-preview"
+            client_kwargs["model"] = "gpt-4-1106-preview"
 
         response = self._client.chat.completions.create(**client_kwargs)
 
