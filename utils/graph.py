@@ -19,15 +19,15 @@ class MetricGrapher():
         """Generates all individual graphs for evals"""
 
         patterns = {
-            "Hallucination.png": r'Relevancy: (resume|job description) hallucination',
-            "Grammar.png": r"Grammar and Readability:.*",
-            "Accuracy.png": r"Accuracy of explanation:.*"
+            "Grammar.png": [r"Grammar and Readability:.*", int],
+            "Accuracy.png": [r"Accuracy of explanation:.*", int],
+            "Relevancy.png": [r"Relevancy:.*", int]
         }
 
-        for  graph_name, pattern in patterns.items():
-            self.generate_score_graph(pattern, graph_name)
+        for graph_name, pattern_and_type in patterns.items():
+            self.generate_score_graph(pattern_and_type[1], pattern_and_type[0], graph_name)
 
-    def generate_score_graph(self, pattern_str: str=RELEVANCY_MATCH, graph_name: str="graph.png"):
+    def generate_score_graph(self, type, pattern_str: str=RELEVANCY_MATCH, graph_name: str="graph.png"):
         """Generates a graph of the regex matched scores"""
 
         pattern = re.compile(pattern_str, re.IGNORECASE)
@@ -35,6 +35,7 @@ class MetricGrapher():
         key_column="recruiter"
         relevant_columns = [column for column in self.df.columns if pattern.match(column)]
         relevant_df = self.df[relevant_columns]
+        relevant_df[relevant_columns] = relevant_df[relevant_columns].astype(int)
 
         numeric_columns = relevant_df.select_dtypes(include='number').columns
         relevant_numeric_columns = [col for col in relevant_columns if col in numeric_columns]
