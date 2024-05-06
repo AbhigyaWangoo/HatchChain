@@ -24,6 +24,7 @@ class MetricGrapher:
             "Grammar.png": [r"Grammar and Readability:.*", int],
             "Accuracy.png": [r"Accuracy of explanation:.*", int],
             "Relevancy.png": [r"Relevancy:.*", int],
+            "Detail.png": [r".*detailed.*", int]
         }
 
         for graph_name, pattern_and_type in patterns.items():
