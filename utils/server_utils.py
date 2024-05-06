@@ -403,7 +403,8 @@ def tiebreak(resume_id: int, job_id: int) -> decisiontree.ClassificationOutput:
                 num_accept += 1
 
     # 3. Reshape reasoning list depending on a) whether we're accepting or
-    # rejecting based on tiebreaker, and b) the names of the candidates who also were included in the list.
+    # rejecting based on tiebreaker, and b) the names of the candidates who
+    # also were included in the list.
     if total:
         if num_accept / total > 0.5:
             return decisiontree.ClassificationOutput.ACCEPT
