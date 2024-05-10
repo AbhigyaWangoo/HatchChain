@@ -25,6 +25,18 @@ class EvaluationResult():
         self.tn=tn
         self.fn=fn
 
+    def precision(self) -> float:
+        """Calculate and return precision"""
+        return (self.tp / (self.tp + self.fp))
+
+    def recall(self) -> float:
+        """Calculate and return recall"""
+        return (self.tp / (self.tp + self.fn))
+
+    def f1(self) -> float:
+        """Calculate and return F1 score"""
+        return (2 * self.precision() * self.recall()) / (self.precision() + self.recall())
+
 class MetricGrapher:
     """A class to evaluation metrics for the explainable classifications"""
 

@@ -50,8 +50,13 @@ def multiproc_runall():
 
 if __name__ == "__main__":
     grapher = MetricGrapher("data/evals/clean_trustme_evals.csv")
+
     res = grapher.generate_f1_scores("data/outputs/hatch/ml.csv", "data/outputs/ground_truth/ml_gt.csv")
     print(f"True positive rate for backend engineer on hatch: {res.tp}")
     print(f"True neg rate for backend engineer on hatch: {res.tn}")
     print(f"false positive rate for backend engineer on hatch: {res.fp}")
     print(f"false neg rate for backend engineer on hatch: {res.fn}")
+
+    print(f"precision: {res.precision()}")
+    print(f"recall: {res.recall()}")
+    print(f"F1: {res.f1()}")
