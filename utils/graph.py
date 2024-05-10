@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import matplotlib.pyplot as plt
 import os
+from enum import Enum
 import numpy as np
 
 DATA_DIR = "data/"
@@ -9,6 +10,20 @@ GRAPHS_DIR = "graphs/"
 
 RELEVANCY_MATCH = r"Relevancy*"
 
+EXPLAINABLE_CLASSIFICATION_REASONING_COL="explainable_classification_reasoning"
+EXPLAINABLE_CLASSIFICATION_COL="explainable_classification"
+
+NAMES_COL="resume_path"
+
+class EvaluationResult():
+    """
+    A class to hold an evaluation result on one dataset for one role title for one recruiter.
+    """
+    def __init__(self, tp: int, fp: int, tn: int, fn: int) -> None:
+        self.tp=tp
+        self.fp=fp
+        self.tn=tn
+        self.fn=fn
 
 class MetricGrapher:
     """A class to evaluation metrics for the explainable classifications"""
@@ -31,6 +46,45 @@ class MetricGrapher:
             self.generate_score_graph(
                 pattern_and_type[1], pattern_and_type[0], graph_name
             )
+
+    def generate_f1_scores(self, outputs_csv: str, ground_truth_csv: str) -> EvaluationResult | None:
+        """ 
+        This function generates a map of f1 scores for a provided outputs dataset from a llm. 
+
+        outputs_csv: a csv file from some recruiter, which has a list of resumes and corresponding explainable classifications
+        ground_truth_csv: a csv file for some role title which has 2 columns, a resume column, and a binary classification
+        
+        returns a set of scores
+        """
+        outputs_df=pd.read_csv(outputs_csv)
+        ground_truth_df=pd.read_csv(ground_truth_csv)
+
+        tn, tp, fn, fp = 0, 0, 0, 0
+
+        try:
+            classifications=outputs_df[EXPLAINABLE_CLASSIFICATION_COL].tolist()
+            names=outputs_df[NAMES_COL].tolist()
+            zipped_dict_outputs = {key: value for key, value in zip(names, classifications)}
+
+            classifications=ground_truth_df[EXPLAINABLE_CLASSIFICATION_COL].tolist()
+            names=ground_truth_df[NAMES_COL].tolist()
+            zipped_dict_gt = {key: value for key, value in zip(names, classifications)}
+
+            for key in zipped_dict_outputs:
+                if bool(zipped_dict_outputs[key]) and bool(zipped_dict_gt[key]): # true positive
+                    tp+=1
+                elif bool(zipped_dict_outputs[key]) and not bool(zipped_dict_gt[key]): # false positive
+                    fp+=1
+                elif not bool(zipped_dict_outputs[key]) and bool(zipped_dict_gt[key]): # false negative
+                    fn+=1
+                elif not bool(zipped_dict_outputs[key]) and not bool(zipped_dict_gt[key]): # true negative
+                    tn+=1
+
+            return EvaluationResult(tp, fp, tn, fn)
+
+        except KeyError:
+            print("Keys dont exist")
+            return None
 
     def generate_score_graph(
         self, type, pattern_str: str = RELEVANCY_MATCH, graph_name: str = "graph.png"
