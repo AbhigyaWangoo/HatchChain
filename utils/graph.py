@@ -14,7 +14,8 @@ EXPLAINABLE_CLASSIFICATION_REASONING_COL = "explainable_classification_reasoning
 EXPLAINABLE_CLASSIFICATION_COL = "explainable_classification"
 
 NAMES_COL = "resume_path"
-
+LINKS_COL="linkedin links"
+REASONING_COL="reasoning"
 
 class EvaluationResult:
     """
@@ -63,6 +64,26 @@ class MetricGrapher:
             self.generate_score_graph(
                 pattern_and_type[1], pattern_and_type[0], graph_name
             )
+
+    def eval_to_output(self, eval_csv: str, output_csv: str):
+        """
+        Converts the input csv into a readable output_csv for the f1 score reader function.
+        """
+
+        df=pd.read_csv(eval_csv)
+
+        df.drop(columns=[LINKS_COL])
+
+        # Also rename the reasoning col in the df to EXPLAINABLE_CLASSIFICATION_REASONING_COL 
+        # Also add a new classification col in the df called EXPLAINABLE_CLASSIFICATION_COL
+        
+        for reasoning in df[REASONING_COL]:
+            print(reasoning)
+            # 1. read an eval sysprompt that reads positive or negative sentiment from a reasoning
+            # 2. load sysprompt and reaasoning into gpt4 call
+            # 3. get output classification, and append to column in df
+
+        # 4. write same df back to file
 
     def generate_f1_scores(
         self, outputs_csv: str, ground_truth_csv: str
