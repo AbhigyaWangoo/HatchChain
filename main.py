@@ -5,7 +5,11 @@ from llm.client.mistral import MistralLLMClient
 from llm.client.claude import ClaudeClient
 from llm.client.hugging_face import HuggingFaceClient
 
-from utils.graph import MetricGrapher, EvaluationResult, EXPLAINABLE_CLASSIFICATION_REASONING_COL
+from utils.graph import (
+    MetricGrapher,
+    EvaluationResult,
+    EXPLAINABLE_CLASSIFICATION_REASONING_COL,
+)
 
 import multiprocessing
 
@@ -51,7 +55,9 @@ def multiproc_runall():
 if __name__ == "__main__":
     grapher = MetricGrapher("data/evals/clean_trustme_evals.csv")
 
-    res = grapher.generate_f1_scores("data/outputs/hatch/ml.csv", "data/outputs/ground_truth/ml_gt.csv")
+    res = grapher.generate_f1_scores(
+        "data/outputs/hatch/ml.csv", "data/outputs/ground_truth/ml_gt.csv"
+    )
     print(f"True positive rate for backend engineer on hatch: {res.tp}")
     print(f"True neg rate for backend engineer on hatch: {res.tn}")
     print(f"false positive rate for backend engineer on hatch: {res.fp}")
