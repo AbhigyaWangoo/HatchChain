@@ -2,8 +2,8 @@ import pandas as pd
 import re
 import matplotlib.pyplot as plt
 import os
-from enum import Enum
 import numpy as np
+from llm.client.gpt import GPTClient
 
 DATA_DIR = "data/"
 GRAPHS_DIR = "graphs/"
@@ -14,8 +14,12 @@ EXPLAINABLE_CLASSIFICATION_REASONING_COL = "explainable_classification_reasoning
 EXPLAINABLE_CLASSIFICATION_COL = "explainable_classification"
 
 NAMES_COL = "resume_path"
-LINKS_COL="linkedin links"
-REASONING_COL="reasoning"
+LINKS_COL = "linkedin links"
+REASONING_COL = "reasoning"
+
+REJECT='reject'
+ACCEPT='accept'
+TRUE="true"
 
 class EvaluationResult:
     """
@@ -70,20 +74,43 @@ class MetricGrapher:
         Converts the input csv into a readable output_csv for the f1 score reader function.
         """
 
-        df=pd.read_csv(eval_csv)
+        df = pd.read_csv(eval_csv)
 
+        # RM links col. Not used for evaluation.
         df.drop(columns=[LINKS_COL])
+        # Also rename the reasoning col in the df to EXPLAINABLE_CLASSIFICATION_REASONING_COL
+        df.rename(columns={REASONING_COL: EXPLAINABLE_CLASSIFICATION_REASONING_COL}, inplace=True)
+        df.rename(columns={"name": NAMES_COL}, inplace=True)
 
-        # Also rename the reasoning col in the df to EXPLAINABLE_CLASSIFICATION_REASONING_COL 
         # Also add a new classification col in the df called EXPLAINABLE_CLASSIFICATION_COL
-        
-        for reasoning in df[REASONING_COL]:
-            print(reasoning)
-            # 1. read an eval sysprompt that reads positive or negative sentiment from a reasoning
-            # 2. load sysprompt and reaasoning into gpt4 call
-            # 3. get output classification, and append to column in df
+        df[EXPLAINABLE_CLASSIFICATION_COL] = False
+
+        idx=0
+        client=GPTClient()
+        for reasoning in df[EXPLAINABLE_CLASSIFICATION_REASONING_COL]:
+            reasoning=str(reasoning).lower()
+            binclassify=None
+
+            if REJECT in reasoning.lower() and reasoning.count(REJECT)>reasoning.count(ACCEPT):
+                binclassify=False
+            elif ACCEPT in reasoning.lower() and reasoning.count(ACCEPT)>reasoning.count(REJECT):
+                binclassify=True
+            else:
+                # load sysprompt and reaasoning into gpt4 call if there are not rejects or accepts.
+                # Accept and reject count being equal should be a fail. is that a false positive and false negative?
+                binclassify=False
+                print(f"No rejects or accepts present in {eval_csv}")
+                # with open("utils/sysprompts/reasoning_sentiment.txt", "r", encoding="utf8") as fp:
+                #     sysprompt = fp.read()
+                #     res = client.query(reasoning, sys_prompt=sysprompt)
+                #     binclassify = TRUE in res.lower()
+
+            # Change the row's boolean dependant 
+            df.at[idx, EXPLAINABLE_CLASSIFICATION_COL] = binclassify
+            idx+=1
 
         # 4. write same df back to file
+        df.to_csv(output_csv)
 
     def generate_f1_scores(
         self, outputs_csv: str, ground_truth_csv: str
@@ -132,8 +159,8 @@ class MetricGrapher:
 
             return EvaluationResult(tp, fp, tn, fn)
 
-        except KeyError:
-            print("Keys dont exist")
+        except KeyError as e:
+            print(f"Keys dont exist, or something else: {e}")
             return None
 
     def generate_score_graph(

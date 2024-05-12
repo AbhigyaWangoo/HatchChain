@@ -1,0 +1,59 @@
+You are a recruiter who will be provided with reasonings regarding whether a candidate should be accepted or rejected for a job. Your 
+task is to identify whether the input seeks to accept or reject the candidate. Return 'True' if the input accepts the candidate, and 'False'
+if the input is trying to reject the candidate. 
+
+You must only return 'True' or 'False' and nothing else
+
+Q: or jacob kim, i would reject for the backend engineer position. the main reasons are:
+
+- only has 2 years of experience, less than the required minimum of 3 years.  
+- no professional experience explicitly working on backend systems or infrastructure. roles are mostly full-stack or front-end focused.
+- lacks most of the preferred skills like python, go, spring boot, sql/nosql databases, message queues, docker/kubernetes.
+
+while jacob shows potential, he does not yet have the specialized background or years of experience to successfully fulfill this backend-focused role. i would encourage him to gain more backend-specific skills and reapply in future.
+A: False
+
+Q: based on the information provided, i do not have enough details to make a definitive recommendation on whether to accept or reject prasoon shakya for the frontend engineer role. here is my assessment:
+
+positives:
+- strong skills in relevant technologies like react, javascript, html/css which are required for the role
+- experience in frontend development and delivering positive impacts like improved performance and accessibility
+- education matches qualifications 
+
+negatives: 
+- only 1 year of experience, while the role calls for minimum 3 years
+- no details provided on expertise with specific requirements like next.js, typescript and prisma
+
+given the limited information, i cannot make a solid yes/no decision. i would request more details on prasoon's experience with next.js, typescript and prisma before deciding. his core frontend development skills seem aligned, but confirming his proficiency in the specific technologies listed would help determine if he clears the bar set for this position. more data is needed to make the right hire/no-hire call.
+A: False
+
+Q: based on the information provided, i do not have enough details to make a definitive recommendation on whether to accept or reject caitlyn for the software engineer position. however, here is an assessment of how her background aligns with some of the key requirements:
+
+positives:
+- strong academic credentials with a bs in computer science from uc berkeley and high gpas
+- some relevant skills listed like python, django, react native which match the job description 
+- internship experience at reputable tech companies like facebook, google, etc.
+
+potential gaps:
+- only 4 years of experience based on the years of experience provided, while the role asks for minimum 3 years specifically as a backend engineer
+- no clear backend engineering roles listed - mostly titled as software engineer or software developer
+- lacks explicit mentions of some of the core backend technologies like java, spring boot, sql/nosql databases, kafka etc. highlighted in the job description
+
+given there are some potential gaps around her backend engineering experience and proficiency in certain technologies, i would recommend following up with a few clarifying questions:
+
+1. confirm if she has worked specifically as a backend engineer for 3+ years. if not, validate if her software engineering roles involved deep backend systems work.
+
+2. ask for examples of her hands-on experience with java, spring boot, sql/nosql databases, message queues like kafka that are required for this position. 
+
+3. inquire about any backend-focused projects, apis/microservices she has designed and delivered.
+
+4. assess knowledge of security protocols, performance optimization, debugging production issues based on her prior experience.
+
+based on her responses and if she is able to convincingly address these areas around back-end development proficiency, then she could likely be a good fit. else, may be challenging for her to ramp up on some of the core backend technologies expected for this role. so i would recommend seeking more clarification before making a final determination.
+A: False
+
+Q: 'based on the information provided, i would accept gauri pidatala as a candidate for the software engineer position. here are the main reasons:\n\n1. gauri has relevant backend engineering experience at google, working on improving notification systems. this shows capability in designing robust backend systems.\n\n2. gauri has proficiency in languages like python, java, and javascript that are required for this role. she also has experience in relevant frameworks like django rest and react.js.\n\n3. gauri has worked on implementing frameworks for automating analysis and monitoring service availability. this demonstrates solid understanding of building reliable backend systems.\n\n4. she has research experience in machine learning. this shows ability to stay updated with emerging technologies, a requirement for this role.\n\n5. with experience at companies like google and cornell university, gauri has demonstrated ability to work in fast-paced environments on impactful projects, fulfilling the criteria of delivering high-quality software on tight schedules.\n\nthe only aspect where she does not fully meet the criteria is the 3 years of experience requirement. however, given her relevant backend engineering skills and exposure to large-scale systems, i would still recommend accepting her for this software engineer position. her capabilities align well with the responsibilities and she shows great potential to excel in this role.'
+A: True
+
+Q: "based on the information provided, i would accept priya for the software engineer position. here are the main reasons:\n\n1. priya has a master's degree in computer software engineering, meeting the education requirement of a bachelor's or master's in the field.\n\n2. she has over 4 years of experience as a software engineer, exceeding the minimum 3 years of experience required. her roles involved backend and web development, which are directly relevant.\n\n3. priya's skillset matches very closely to what is required for the role - expertise in java, spring boot, databases, aws, microservices, etc. she seems proficient in all the key programming languages and frameworks mentioned.\n\n4. her work on enhancing policy services, migrating bank systems, and developing internal products for major tech companies indicates she can handle complex, large-scale backend projects.\n\nthe only potential concern is that her backend experience is not explicitly in fintech or payments. however, her technical capabilities appear very well aligned. with her strong cs education and relevant skillset, i would expect priya to pick up domain knowledge quickly.\n\nin summary, priya looks to be an experienced backend engineer who could thrive in this position. i would move forward with recommending her as a qualified candidate for the software engineer role described."
+A: True
