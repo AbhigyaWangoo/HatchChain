@@ -79,37 +79,32 @@ class MetricGrapher:
         # RM links col. Not used for evaluation.
         df.drop(columns=[LINKS_COL])
         # Also rename the reasoning col in the df to EXPLAINABLE_CLASSIFICATION_REASONING_COL
-        df.rename(columns={REASONING_COL: EXPLAINABLE_CLASSIFICATION_REASONING_COL}, inplace=True)
         df.rename(columns={"name": NAMES_COL}, inplace=True)
 
         # Also add a new classification col in the df called EXPLAINABLE_CLASSIFICATION_COL
-        df[EXPLAINABLE_CLASSIFICATION_COL] = False
+        df[EXPLAINABLE_CLASSIFICATION_COL] = "False"
 
         idx=0
-        client=GPTClient()
-        for reasoning in df[EXPLAINABLE_CLASSIFICATION_REASONING_COL]:
+        for reasoning in df[REASONING_COL]:
             reasoning=str(reasoning).lower()
             binclassify=None
 
             if REJECT in reasoning.lower() and reasoning.count(REJECT)>reasoning.count(ACCEPT):
-                binclassify=False
+                binclassify="False"
             elif ACCEPT in reasoning.lower() and reasoning.count(ACCEPT)>reasoning.count(REJECT):
-                binclassify=True
+                binclassify="True"
             else:
                 # load sysprompt and reaasoning into gpt4 call if there are not rejects or accepts.
-                # Accept and reject count being equal should be a fail. is that a false positive and false negative?
-                binclassify=False
+                # Accept and reject count being equal should be a fail.
+                binclassify="None"
                 print(f"No rejects or accepts present in {eval_csv}")
-                # with open("utils/sysprompts/reasoning_sentiment.txt", "r", encoding="utf8") as fp:
-                #     sysprompt = fp.read()
-                #     res = client.query(reasoning, sys_prompt=sysprompt)
-                #     binclassify = TRUE in res.lower()
 
             # Change the row's boolean dependant 
-            df.at[idx, EXPLAINABLE_CLASSIFICATION_COL] = binclassify
+            df.at[idx, EXPLAINABLE_CLASSIFICATION_COL] = str(binclassify)
             idx+=1
 
-        # 4. write same df back to file
+        # 4. write same df back to file, but drop reasonings
+        df.drop(columns=[REASONING_COL])
         df.to_csv(output_csv)
 
     def generate_f1_scores(
@@ -139,23 +134,31 @@ class MetricGrapher:
             names = ground_truth_df[NAMES_COL].tolist()
             zipped_dict_gt = {key: value for key, value in zip(names, classifications)}
 
+            idx=0
+            gt_lst_vals=list(zipped_dict_gt.values())
             for key in zipped_dict_outputs:
-                if bool(zipped_dict_outputs[key]) and bool(
-                    zipped_dict_gt[key]
-                ):  # true positive
-                    tp += 1
-                elif bool(zipped_dict_outputs[key]) and not bool(
-                    zipped_dict_gt[key]
-                ):  # false positive
-                    fp += 1
-                elif not bool(zipped_dict_outputs[key]) and bool(
-                    zipped_dict_gt[key]
-                ):  # false negative
-                    fn += 1
-                elif not bool(zipped_dict_outputs[key]) and not bool(
-                    zipped_dict_gt[key]
-                ):  # true negative
-                    tn += 1
+                classification = str(zipped_dict_outputs[key]).lower()
+
+                if classification == "true" or classification == "false": # need to skip inconclusive entries
+                    classification = classification == "true"
+
+                    if key not in zipped_dict_gt:
+                        gt_val = bool(gt_lst_vals[idx]) # index bullshit. In case the name matching is off. and it usually is.
+                    else:
+                        gt_val = bool(zipped_dict_gt[key])
+
+                    if classification and gt_val:  # true positive
+                        tp += 1
+                    elif classification and not gt_val:  # false positive
+                        fp += 1
+                    elif not classification and gt_val:  # false negative
+                        fn += 1
+                    elif not classification and not gt_val:  # true negative
+                        tn += 1
+                else:
+                    print("Found inconclusive candidate")
+
+                idx+=1
 
             return EvaluationResult(tp, fp, tn, fn)
 
