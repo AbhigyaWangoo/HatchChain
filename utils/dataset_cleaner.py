@@ -15,7 +15,10 @@ RELEVANCY_COL_3 = "Relevancy: Did the reasoning mention an information that was 
 
 EVALS_FILE = "data/evals/eval_responses.csv"
 NUMERICAL_SYSPROMPT = "utils/sysprompts/numerical_prompt.txt"
+SENTIMENT_ANALYSIS_SYSPROMPT = "utils/sysprompts/reasoning_sentiment.txt"
 
+REJECT="reject"
+ACCEPT="accept"
 
 def clean_classifier_results(eval_csv: str = EVALS_FILE, ofile: str = "output.json"):
     """
@@ -92,6 +95,44 @@ def process_directory(directory_path):
 
                 except Exception as e:
                     print(f"error writing customer back: {e}")
+
+def clean_indecisive_entires(dataset_csv: str, reasoning_col: str, new_classification_col: str, write_back: bool=False) -> pd.DataFrame:
+    """
+    Takes all indecisive responses and forces them to have a binary classificartion.
+    """
+    df = pd.read_csv(dataset_csv)
+    col = df[reasoning_col].to_list()
+
+    if new_classification_col in df:
+        print(f"Column {new_classification_col} already exists. exiting.")
+        return df
+
+    df[new_classification_col] = False
+    with open(SENTIMENT_ANALYSIS_SYSPROMPT, "r", encoding="utf8") as fp:
+        sysprompt=fp.read()
+        client = gpt.GPTClient()
+
+        n_unknowns=0
+        for idx, reasoning in enumerate(col):
+            binclassify=False
+
+            if REJECT in reasoning.lower() and reasoning.count(REJECT)>reasoning.count(ACCEPT):
+                binclassify=False
+            elif ACCEPT in reasoning.lower() and reasoning.count(ACCEPT)>reasoning.count(REJECT):
+                binclassify=True
+            else:
+                n_unknowns+=1
+                response = client.query(sys_prompt=sysprompt, prompt=reasoning)
+                binclassify ="true" in response.lower()
+
+            df.at[idx, new_classification_col] = binclassify
+
+        print(f"Num unknowns for {dataset_csv}: {n_unknowns}")
+
+    if write_back:
+        df.to_csv(dataset_csv)
+
+    return df
 
 
 def convert_to_csv(directory_path: str = DIRSRC):

@@ -3,7 +3,7 @@ import re
 import matplotlib.pyplot as plt
 import os
 import numpy as np
-from llm.client.gpt import GPTClient
+from utils.dataset_cleaner import clean_indecisive_entires
 
 DATA_DIR = "data/"
 GRAPHS_DIR = "graphs/"
@@ -76,35 +76,16 @@ class MetricGrapher:
 
         df = pd.read_csv(eval_csv)
 
+        df = clean_indecisive_entires(eval_csv, "reasoning", EXPLAINABLE_CLASSIFICATION_COL, True)
+       
         # RM links col. Not used for evaluation.
-        df.drop(columns=[LINKS_COL])
+        df.drop(columns=[LINKS_COL], axis=1, inplace=True)
+        df.drop(columns=["Unnamed*"], axis=1, inplace=True)
         # Also rename the reasoning col in the df to EXPLAINABLE_CLASSIFICATION_REASONING_COL
         df.rename(columns={"name": NAMES_COL}, inplace=True)
-
-        # Also add a new classification col in the df called EXPLAINABLE_CLASSIFICATION_COL
-        df[EXPLAINABLE_CLASSIFICATION_COL] = "False"
-
-        idx=0
-        for reasoning in df[REASONING_COL]:
-            reasoning=str(reasoning).lower()
-            binclassify=None
-
-            if REJECT in reasoning.lower() and reasoning.count(REJECT)>reasoning.count(ACCEPT):
-                binclassify="False"
-            elif ACCEPT in reasoning.lower() and reasoning.count(ACCEPT)>reasoning.count(REJECT):
-                binclassify="True"
-            else:
-                # load sysprompt and reaasoning into gpt4 call if there are not rejects or accepts.
-                # Accept and reject count being equal should be a fail.
-                binclassify="None"
-                print(f"No rejects or accepts present in {eval_csv}")
-
-            # Change the row's boolean dependant 
-            df.at[idx, EXPLAINABLE_CLASSIFICATION_COL] = str(binclassify)
-            idx+=1
-
-        # 4. write same df back to file, but drop reasonings
-        df.drop(columns=[REASONING_COL])
+        
+        # write same df back to file, but drop reasonings
+        df.drop(columns=[REASONING_COL], axis=1, inplace=True)
         df.to_csv(output_csv)
 
     def generate_f1_scores(
@@ -137,26 +118,21 @@ class MetricGrapher:
             idx=0
             gt_lst_vals=list(zipped_dict_gt.values())
             for key in zipped_dict_outputs:
-                classification = str(zipped_dict_outputs[key]).lower()
+                classification = bool(zipped_dict_outputs[key])
 
-                if classification == "true" or classification == "false": # need to skip inconclusive entries
-                    classification = classification == "true"
-
-                    if key not in zipped_dict_gt:
-                        gt_val = bool(gt_lst_vals[idx]) # index bullshit. In case the name matching is off. and it usually is.
-                    else:
-                        gt_val = bool(zipped_dict_gt[key])
-
-                    if classification and gt_val:  # true positive
-                        tp += 1
-                    elif classification and not gt_val:  # false positive
-                        fp += 1
-                    elif not classification and gt_val:  # false negative
-                        fn += 1
-                    elif not classification and not gt_val:  # true negative
-                        tn += 1
+                if key not in zipped_dict_gt:
+                    gt_val = bool(gt_lst_vals[idx]) # index bullshit. In case the name matching is off. and it usually is.
                 else:
-                    print("Found inconclusive candidate")
+                    gt_val = bool(zipped_dict_gt[key])
+
+                if classification and gt_val:  # true positive
+                    tp += 1
+                elif classification and not gt_val:  # false positive
+                    fp += 1
+                elif not classification and gt_val:  # false negative
+                    fn += 1
+                elif not classification and not gt_val:  # true negative
+                    tn += 1
 
                 idx+=1
 
